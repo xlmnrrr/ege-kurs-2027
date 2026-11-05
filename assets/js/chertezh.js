@@ -46,6 +46,21 @@ export class Chertezh {
     if (typeof ResizeObserver !== 'undefined') { let w = 0; new ResizeObserver(([e]) => { const nw = Math.round(e.contentRect.width); if (nw && nw !== w) { w = nw; if (this.items.length) this.render(); } }).observe(svg); }
   }
 
+  /** Настройки рисунка после создания (рисунки номера задают их сами): mode, width, height, scale, center, notebook, yaw, pitch */
+  opts(o = {}) {
+    const was3d = this.mode === '3d';
+    if (o.mode) this.mode = o.mode;
+    if (o.width) this.W = o.width; if (o.height) this.H = o.height;
+    if (o.scale) this.scale = o.scale; if (o.center) this.center = o.center;
+    if (o.notebook) this.notebook = o.notebook;
+    this.yaw = o.yaw ?? (o.notebook ? o.notebook.yaw : this.yaw); this.pitch = o.pitch ?? (o.notebook ? o.notebook.pitch : this.pitch);
+    this.svg.setAttribute('viewBox', `0 0 ${this.W} ${this.H}`);
+    if (this.mode === '3d' && !was3d && !this._rot) this.enableRotate();
+    return this;
+  }
+  /** Число шагов рисунка (максимальный номер шага + 1) */
+  get steps() { return this.items.reduce((m, it) => Math.max(m, it.step), 0) + 1; }
+
   // ---------- проекция ----------
   basis() {
     const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
@@ -281,6 +296,7 @@ export class Chertezh {
 
   // ---------- вращение ----------
   enableRotate() {
+    this._rot = true;
     let drag = null;
     this.svg.style.touchAction = 'none';
     this.svg.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw: this.yaw, pitch: this.pitch }; this.svg.setPointerCapture(e.pointerId); this.svg.classList.add('ch-drag'); });

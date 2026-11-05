@@ -1,0 +1,18 @@
+{
+  "name": "ЕГЭ курс 2027",
+  "short_name": "ЕГЭ 2027",
+  "description": "Личный курс подготовки к ЕГЭ: профильная математика и физика",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1C222E",
+  "theme_color": "#1C222E",
+  "icons": [
+    { "src": "assets/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/img/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
