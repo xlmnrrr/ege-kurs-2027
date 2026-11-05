@@ -289,7 +289,7 @@ export class Chertezh {
     this.svg.querySelectorAll('[data-step]').forEach((e) => {
       const s = +e.dataset.step;
       e.classList.toggle('on', s <= n);
-      e.classList.toggle('now', s === n && n > 0);
+      e.classList.toggle('now', s === n);
     });
     this._declutter();
   }

@@ -35,6 +35,8 @@
 .ch .ch-label.v-vel { fill: var(--c-acc); } .ch .ch-label.v-force { fill: var(--c-acc2); } .ch .ch-label.v-field { fill: var(--c-con); }
 .ch .ch-label.num { font-style: normal; font-family: KaTeX_Main, serif; font-size: 18px; fill: var(--faint); }
 .ch .ch-sub { font-size: 70%; }
+/* выражение на рисунке («CD = 3», «R = 5 см»): прямой шрифт формул, буквы — курсивом не выделяются */
+.ch .ch-label.expr { font-style: normal; font-family: KaTeX_Main, serif; font-size: 19px; }
 
 /* клетчатая сетка как в КИМ */
 .ch .ch-grid line { stroke: var(--line, #3B4558); stroke-width: 1; }

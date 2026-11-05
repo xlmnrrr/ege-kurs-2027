@@ -4,6 +4,7 @@ import * as store from './store.js';
 import { fold, dueReviews, streak, level, forecast, mastery, dayKey } from './progress.js';
 import { buildPlan, feasibility, DEFAULTS } from './plan.js';
 import { renderNumber, renderReview } from './number.js';
+import { renderDiag } from './diag.js';
 import { openCalc } from './calc.js';
 import { sound, orbits } from './extras.js';
 import { startSync, syncNow, syncStatus } from './sync.js';
@@ -121,6 +122,7 @@ async function route() {
     else if (parts[0] === 'заметки') view = notesView();
     else if (parts[0] === 'настройки') view = settingsView();
     else if (parts[0] === 'повтор') view = await renderReview(App);
+    else if (parts[0] === 'диагностика') view = await renderDiag(App, parts[1]);
     else view = notFound();
   } catch (e) { console.error(e); view = h(`<div class="page"><h1>Не открылось</h1><p class="lead">${esc(e.message)}. Обнови страницу; если повторится — проверь, что сайт обновился.</p></div>`); }
   main.innerHTML = ''; main.appendChild(view);
@@ -144,7 +146,8 @@ async function home() {
     <section class="today" aria-labelledby="today-h"><h1 id="today-h">${todayTitle(today)}</h1>
       <p class="lead">До математики ${plural(daysTo(ex['математика']), 'день', 'дня', 'дней')}, до физики ${plural(daysTo(ex['физика']), 'день', 'дня', 'дней')}.</p>
       <div class="blocks">${(today.blocks || []).map(blockHTML).join('') || '<p class="muted">Сегодня по плану отдых. Можно повторить ошибки или решить пару задач.</p>'}</div>
-      <div class="row"><a class="btn primary" href="${startHref(today, due)}">Начать занятие</a>${due ? `<a class="btn" href="#/повтор">Повторить ошибки: ${due}</a>` : ''}</div>
+      ${Object.keys(S.diag).length ? '' : '<div class="key ui">Сначала пройди <a href="#/диагностика">диагностику</a>: по 1–2 задачи на каждый номер. План начнёт со слабых номеров.</div>'}
+      <div class="row"><a class="btn primary" href="${Object.keys(S.diag).length ? startHref(today, due) : '#/диагностика'}">${Object.keys(S.diag).length ? 'Начать занятие' : 'Пройти диагностику'}</a>${due ? `<a class="btn" href="#/повтор">Повторить ошибки: ${due}</a>` : ''}</div>
       <div class="stats" style="margin-top:var(--s5)">
         ${['математика', 'физика'].map((s) => `<div class="stat"><div class="v">${fc[s].test}</div><div class="l">${s}: прогноз баллов (цель 90)</div><div class="bar"><i style="width:${Math.min(100, (fc[s].test / 90) * 100)}%"></i></div></div>`).join('')}
         <div class="stat"><div class="v">${st}</div><div class="l">серия учебных дней</div></div>

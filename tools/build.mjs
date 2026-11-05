@@ -83,6 +83,22 @@ async function main() {
       console.log(`${id}: ${(bin.length / 1024).toFixed(0)} КБ, задач ${info.tasks}, примеров ${bundle.examples.length}`);
     }
   }
+  // диагностика: контент\диагностика\<предмет>.json (+ рисунки.js) -> dm.bin, df.bin
+  const ddir = join(CONTENT, 'диагностика');
+  if (existsSync(ddir)) {
+    const figSrc = existsSync(join(ddir, 'рисунки.js')) ? readFileSync(join(ddir, 'рисунки.js'), 'utf8') : '';
+    const camel = (x) => String(x || '').replace(/-([\p{L}\d])/gu, (_, c) => c.toUpperCase());
+    for (const [subject, did] of [['математика', 'dm'], ['физика', 'df']]) {
+      const f = join(ddir, `${subject}.json`);
+      if (!existsSync(f) || (only.length && !only.includes(did))) continue;
+      const raw = JSON.parse(readFileSync(f, 'utf8'));
+      const tasks = raw.filter((t) => t.проверка?.статус !== 'спорная').map((t) => ({ id: t.id, num: t.номер_id, part: t.часть, q: inline(t.условие), a: String(t.ответ ?? ''), tol: t.допуск || null,
+        fig: t.рисунок ? camel(t.рисунок) : null, sol: mdText(t.решение), criteria: t.критерии ? mdText(t.критерии) : '', max: t.макс || 1, src: t.источник || null }));
+      const bin = await seal(K, gzipSync(Buffer.from(JSON.stringify({ id: did, subject, tasks, figures: figSrc })), { level: 9 }));
+      writeFileSync(join(OUT, `${did}.bin`), bin);
+      console.log(`${did}: диагностика ${subject}, задач ${tasks.length}, ${(bin.length / 1024).toFixed(0)} КБ`);
+    }
+  }
   const catalog = catalogBase.map((n) => ({ ...n, ...(infos[n.id] && !infos[n.id].keep ? infos[n.id] : {}), hasContent: !!infos[n.id] }));
   const cat = await seal(K, gzipSync(Buffer.from(JSON.stringify({ numbers: catalog, built: new Date().toISOString() })), { level: 9 }));
   writeFileSync(join(OUT, 'catalog.bin'), cat);

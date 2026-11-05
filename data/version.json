@@ -1,7 +1,12 @@
 {
- "v": "de0013b641ab",
+ "v": "d21e5b274178",
  "files": [
   "catalog.bin",
-  "m01.bin"
+  "dm.bin",
+  "m01.bin",
+  "m02.bin",
+  "m03.bin",
+  "m04.bin",
+  "m05.bin"
  ]
 }

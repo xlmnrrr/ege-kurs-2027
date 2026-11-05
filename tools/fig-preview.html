@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Предпросмотр рисунков номера</title>
+<link rel="stylesheet" href="../assets/css/tokens.css"><link rel="stylesheet" href="../assets/css/base.css"><link rel="stylesheet" href="../assets/css/chertezh.css">
+<style>
+  body { padding: 12px; } .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .cell { background: var(--surface); border-radius: 12px; padding: 8px; } .cell h4 { font: 600 13px/1.3 var(--font-ui); margin: 0 0 6px; color: var(--muted); }
+  .cell .stage { background: var(--surface2); border-radius: 10px; } .err { color: var(--err); font: 13px var(--font-ui); }
+</style>
+</head>
+<body>
+<h1 style="font-size:20px">Рисунки: <span id="t"></span></h1>
+<div class="grid" id="g"></div>
+<script type="module">
+// Открывать через сервер с корнем проекта: http://127.0.0.1:8111/сайт/tools/fig-preview.html?n=математика/03
+import { Chertezh, mid, lerp, V } from '../assets/js/chertezh.js';
+const qs = new URLSearchParams(location.search), n = qs.get('n'), only = qs.get('f') || '';
+document.getElementById('t').textContent = n;
+const g = document.getElementById('g');
+const errs = [];
+try {
+  const mod = await import(`../../контент/${n}/рисунки.js?${Date.now()}`);
+  for (const [name, fn] of Object.entries(mod)) {
+    if (typeof fn !== 'function' || !name.startsWith(only)) continue;
+    // сколько шагов: создаём один раз, смотрим максимальный шаг
+    const probe = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const ch0 = new Chertezh(probe, { mode: '2d' }); fn(ch0, { mid, lerp, V });
+    const steps = ch0.steps;
+    for (let s = 0; s < steps; s++) {
+      const cell = document.createElement('div'); cell.className = 'cell';
+      cell.innerHTML = `<h4>${name} · шаг ${s + 1}/${steps}</h4><div class="stage"><svg></svg></div>`;
+      g.appendChild(cell);
+      try { const ch = new Chertezh(cell.querySelector('svg'), { mode: '2d' }); fn(ch, { mid, lerp, V }); ch.render(); ch.setStep(s, true); }
+      catch (e) { errs.push(`${name}: ${e.message}`); cell.insertAdjacentHTML('beforeend', `<p class="err">${e.message}</p>`); }
+    }
+  }
+} catch (e) { errs.push(e.message); g.insertAdjacentHTML('beforeend', `<p class="err">${e.message}</p>`); }
+window.__errs = errs; document.body.dataset.ready = '1';
+</script>
+</body>
+</html>
