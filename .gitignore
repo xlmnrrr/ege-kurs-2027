@@ -1,0 +1,22 @@
+# Ничего из КАГ, каталога, ключей и временного в репозиторий не попадает
+справки/
+каталог/
+временное/
+*.sqlite
+*.sqlite-*
+*.db
+*.exe
+*.mp4
+*.djvu
+*.pdf
+.env
+.env.*
+node_modules/
+__pycache__/
+.venv/
+tools/out/
+# незашифрованный контент собирается в content-build/ и в git не идёт
+content-build/
+*.pem
+*.key
+*-key.pem
