@@ -11,6 +11,8 @@ const SITE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PW = readFileSync(join(SITE, '..', 'справки', 'тестовый-пароль.txt'), 'utf8').trim();
 const shotsDir = process.argv.includes('--shots') ? process.argv[process.argv.indexOf('--shots') + 1] : null;
 const PORT = 8120, BASE = `http://127.0.0.1:${PORT}/`;
+// ответы задач №1 — тест не зависит от состава банка (задачи генерируются)
+const ANS = Object.fromEntries(JSON.parse(readFileSync(join(SITE, '..', 'контент', 'математика', '01', 'задачи.json'), 'utf8')).map((t) => [t.id, t.ответ]));
 const syncDir = mkdtempSync(join(tmpdir(), 'ege-sync-'));
 const server = spawn(process.execPath, [join(SITE, 'tools', 'dev-server.mjs'), SITE, String(PORT)], { env: { ...process.env, EGE_SYNC_DIR: syncDir }, stdio: 'ignore' });
 await sleep(700);
@@ -53,7 +55,7 @@ try {
   await p.open(BASE); ok(await p.until(`!!document.querySelector('#orbits')`, 10000), 'после перезагрузки вход не нужен (устройство запомнено)');
   // номер: разбор, шаги рисунка
   await p.run(`location.hash='#/м/1'`); ok(await p.until(`!!document.querySelector('.example .stage svg .ch-line')`, 10000), 'номер 1: пример с рисунком');
-  ok(await p.run(`document.querySelectorAll('.example .stepcard').length === 4`), 'пример: 4 шага');
+  ok(await p.run(`document.querySelector('.example').querySelectorAll('.stepcard').length === 4`), 'пример: 4 шага');
   await p.run(`document.querySelector('.example [data-next]').click()`); await sleep(300);
   ok(await p.run(`document.querySelector('.example .stepcard.cur h4').textContent.includes('Шаг 2')`), 'кнопка «›» — шаг 2, карточка подсвечена');
   ok(await p.run(`document.querySelectorAll('.example svg [data-step="1"].on').length > 0 && document.querySelectorAll('.example svg [data-step="2"].on').length === 0`), 'рисунок показывает только шаги ≤ текущего');
@@ -62,19 +64,21 @@ try {
   ok(await noHScroll(p), 'страница номера 393 px: без горизонтальной прокрутки');
   await shot(p, 'iphone-number');
   // уже знаю
-  await p.run(`(()=>{document.querySelector('.known input').value='3'; document.querySelector('.known form').requestSubmit();})()`); await sleep(400);
-  ok((await p.run(`document.querySelector('.kn-res').textContent`)).includes('1 из 1'), '«Уже знаю?»: результат 1 из 1');
+  const knIds = await p.run(`[...document.querySelectorAll('.known input')].map(i=>i.dataset.id)`);
+  await p.run(`(()=>{const A=${JSON.stringify(ANS)}; document.querySelectorAll('.known input').forEach(i=>{i.value=A[i.dataset.id];}); document.querySelector('.known form').requestSubmit();})()`); await sleep(400);
+  ok((await p.run(`document.querySelector('.kn-res').textContent`)).includes(`${knIds.length} из ${knIds.length}`), `«Уже знаю?»: верные ответы приняты (${knIds.length} из ${knIds.length})`);
   // лист формул
   await p.run(`document.querySelector('.add-formula').click()`); await sleep(300);
   // тренажёр: 3 ошибки -> подсказка 1, подсказка 2, решение
   await p.run(`location.hash='#/м/1/тренажёр'`); await p.until(`!!document.querySelector('.task')`, 8000);
-  const wrong = async () => { await p.run(`(()=>{const i=document.querySelector('.task input'); i.value='14'; document.querySelector('.task form').requestSubmit();})()`); await sleep(250); };
+  const wrong = async () => { await p.run(`(()=>{const i=document.querySelector('.task input'); i.value='99999'; document.querySelector('.task form').requestSubmit();})()`); await sleep(250); };
   await wrong(); ok(await p.run(`document.querySelectorAll('.task .hint').length === 1`), 'ошибка 1 → подсказка 1');
   await wrong(); ok(await p.run(`document.querySelectorAll('.task .hint').length === 2`), 'ошибка 2 → подсказка 2');
   await wrong(); ok(await p.run(`!!document.querySelector('.task .key') && document.querySelector('.task input').disabled`), 'ошибка 3 → полное решение, ввод закрыт');
   await shot(p, 'iphone-trainer');
   await p.run(`[...document.querySelectorAll('.task .btn.primary')].find(b=>b.textContent.includes('Следующая')).click()`); await sleep(400);
-  await p.run(`(()=>{const i=document.querySelector('.task input'); i.value=' 10 '; document.querySelector('.task form').requestSubmit();})()`); await sleep(300);
+  const tid = (await p.run(`document.querySelector('.task').getAttribute('aria-label')`)).replace('Задача ', '');
+  await p.run(`(()=>{const i=document.querySelector('.task input'); i.value=${JSON.stringify(' ' + (ANS[tid] || '') + ' ')}; document.querySelector('.task form').requestSubmit();})()`); await sleep(300);
   ok((await p.run(`document.querySelector('.task .result').textContent`)).startsWith('Верно'), 'верный ответ (с пробелами) принят');
   // повторение: ошибка сегодня → появится завтра (подменяем время)
   ok(await p.run(`import('./assets/js/progress.js').then(m=>import('./assets/js/store.js').then(s=>s.all('events').then(ev=>m.dueReviews(m.fold(ev), Date.now()+86400000).length)))`) >= 1, 'задача с ошибкой — в повторении завтра (1/3/7/21)');
