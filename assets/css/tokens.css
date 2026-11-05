@@ -1,0 +1,29 @@
+/* Токены дизайна «Вечерняя лампа» — значения и роли в DESIGN.md. Страницы используют только имена. */
+@font-face { font-family: Literata; src: url("../fonts/literata.woff2") format("woff2"); font-weight: 400 700; font-style: normal; font-display: swap; }
+@font-face { font-family: Literata; src: url("../fonts/literata-italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: Commissioner; src: url("../fonts/commissioner.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+:root {
+  color-scheme: dark;
+  /* цвет */
+  --bg: #1C222E; --surface: #242B39; --surface2: #2C3546; --line: #3B4558; --line-strong: #66708A;
+  --text: #ECE4D8; --muted: #ABA497; --primary: #E9B062; --on-primary: #2A1C08;
+  --blue: #8EB4EA; --peach: #F2A98F; --ok: #8DC9A0; --err: #E8857A;
+  --tint-blue: color-mix(in srgb, var(--blue) 12%, var(--surface));
+  --tint-peach: color-mix(in srgb, var(--peach) 12%, var(--surface));
+  --tint-ok: color-mix(in srgb, var(--ok) 12%, var(--surface));
+  --tint-err: color-mix(in srgb, var(--err) 12%, var(--surface));
+  /* шрифты */
+  --font-text: Literata, Georgia, "Times New Roman", serif;
+  --font-ui: Commissioner, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-math: KaTeX_Main, "Times New Roman", serif;
+  /* шкала текста */
+  --fs-h1: clamp(26px, 2.2vw + 18px, 34px); --fs-h2: clamp(20px, 1vw + 16px, 22px);
+  --fs-text: clamp(18px, 0.3vw + 17px, 19px); --fs-ui: 15px; --fs-small: 13px;
+  --lh-text: 1.65; --lh-head: 1.18; --lh-ui: 1.4;
+  /* отступы и форма */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+  --r-btn: 10px; --r-field: 12px; --r-panel: 16px;
+  --measure: 720px; --page: 1200px; --tap: 44px;
+  /* движение */
+  --t-fast: 160ms; --t-ui: 220ms; --t-draw: 700ms; --t-fade: 350ms; --ease: cubic-bezier(.2, .7, .2, 1);
+}

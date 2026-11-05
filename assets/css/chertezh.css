@@ -1,0 +1,57 @@
+/* Стиль чертежей курса (черновик для DRAWINGS.md). Цвета берутся из токенов сайта. */
+.ch { --ink: var(--text, #EEE6DA); --faint: var(--muted, #ABA497); --c-con: var(--blue, #8EB4EA);
+  --c-acc: var(--primary, #E9B062); --c-acc2: var(--peach, #F2A98F); --c-face: var(--blue, #8EB4EA);
+  --w: 2.2; display: block; width: 100%; height: auto; user-select: none; -webkit-user-select: none; overflow: visible; }
+.ch-drag { cursor: grabbing; }
+.ch line, .ch polyline, .ch polygon, .ch path, .ch circle { vector-effect: non-scaling-stroke; }
+/* роли линий */
+.ch .ch-line, .ch .ch-poly, .ch .ch-curve { stroke: var(--ink); stroke-width: var(--w); fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.ch .ch-hidden { stroke: var(--faint); stroke-width: 1.6; stroke-dasharray: 7 6; fill: none; }
+.ch .construct { stroke: var(--c-con); stroke-width: 1.6; }
+.ch .ch-hidden.construct { stroke: var(--c-con); stroke-opacity: .7; }
+.ch .accent { stroke: var(--c-acc); stroke-width: 3.6; }
+.ch .accent2 { stroke: var(--c-acc2); stroke-width: 3.6; }
+.ch .ch-hidden.accent, .ch .ch-hidden.accent2 { stroke-width: 2.4; }
+.ch .thin { stroke-width: 1.4; }
+.ch .ch-face { fill: var(--c-face); fill-opacity: .07; stroke: none; }
+.ch .ch-face.section { fill: var(--c-acc); fill-opacity: .22; }
+.ch .ch-face.ghost { fill-opacity: 0; }
+.ch .ch-pt { fill: var(--ink); stroke: var(--bg, #1C222E); stroke-width: 1.5; }
+.ch .ch-pt-hid { fill: var(--faint); }
+.ch .ch-pt.accent { fill: var(--c-acc); }
+.ch .ch-angle { stroke: var(--c-acc); stroke-width: 1.8; fill: none; }
+.ch .ch-tick { stroke: var(--c-acc); stroke-width: 2; }
+.ch .ch-vec { stroke-width: 3; stroke: var(--ink); }
+.ch .ch-head { fill: var(--ink); stroke: none; }
+.ch .v-vel, .ch .ch-head.v-vel { stroke: var(--c-acc); fill: var(--c-acc); }
+.ch .ch-vec.v-vel { fill: none; }
+.ch .v-force, .ch .ch-head.v-force { stroke: var(--c-acc2); fill: var(--c-acc2); }
+.ch .ch-vec.v-force { fill: none; }
+.ch .v-field, .ch .ch-head.v-field { stroke: var(--c-con); fill: var(--c-con); }
+.ch .ch-vec.v-field { fill: none; stroke-width: 1.8; }
+/* подписи: курсив как в формулах (KaTeX Math), обводка цветом фона — подпись читается поверх линий */
+.ch .ch-label { font: italic 21px/1 KaTeX_Math, "Times New Roman", serif; fill: var(--ink); text-anchor: middle; dominant-baseline: central;
+  paint-order: stroke; stroke: var(--surface2, #2C3546); stroke-width: 4px; stroke-linejoin: round; }
+.ch .ch-label.v-vel { fill: var(--c-acc); } .ch .ch-label.v-force { fill: var(--c-acc2); } .ch .ch-label.v-field { fill: var(--c-con); }
+.ch .ch-label.num { font-style: normal; font-family: KaTeX_Main, serif; font-size: 18px; fill: var(--faint); }
+.ch .ch-sub { font-size: 70%; }
+
+/* клетчатая сетка как в КИМ */
+.ch .ch-grid line { stroke: var(--line, #3B4558); stroke-width: 1; }
+.ch .ch-grid line.ax { stroke: var(--faint); stroke-width: 1.5; }
+.ch .ch-grid .ax-head { fill: var(--faint); }
+.ch .ch-grid .ax-num { font: 15px KaTeX_Main, serif; fill: var(--faint); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--surface2, #2C3546); stroke-width: 4px; }
+.ch .ch-grid .ax-name { font: italic 18px KaTeX_Math, serif; fill: var(--faint); text-anchor: middle; dominant-baseline: central; }
+
+/* шаги: элемент виден, если его шаг ≤ текущего; вперёд линия прорисовывается, назад плавно гаснет */
+.ch [data-step] { opacity: 0; transition: opacity .35s ease; }
+.ch [data-step].on { opacity: 1; }
+.ch:not(.ch-back):not(.ch-instant) .ch-lines [data-step].now:is(.ch-line, .ch-curve, .ch-vec, .ch-poly) {
+  animation: ch-draw .7s ease-out backwards; }
+.ch:not(.ch-back):not(.ch-instant) [data-step].now { transition-duration: .5s; }
+.ch.ch-instant [data-step] { transition: none; }
+/* штрих только на время анимации (fill-mode backwards) — потом линия сплошная при любом размере экрана */
+@keyframes ch-draw { from { stroke-dasharray: var(--len) var(--len); stroke-dashoffset: var(--len); } to { stroke-dasharray: var(--len) var(--len); stroke-dashoffset: 0; } }
+/* текущий шаг подсвечен, прошлые — спокойные */
+.ch .ch-lines [data-step].on:not(.now).accent, .ch .ch-lines [data-step].on:not(.now).accent2 { stroke-opacity: .7; }
+@media (prefers-reduced-motion: reduce) { .ch [data-step] { transition: none !important; animation: none !important; } }
