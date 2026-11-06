@@ -138,7 +138,7 @@ function taskCard(task, numId, figs, opt = {}) {
   const show = (k) => {
     if (k === 1 && hints < 1) { box.appendChild(h(`<div class="hint"><b>Подсказка 1.</b> ${task.h1.replace(/^<p>|<\/p>$/g, '')}</div>`)); hints = 1; }
     else if (k === 2 && hints < 2) { if (hints < 1) show(1); box.appendChild(h(`<div class="hint"><b>Подсказка 2.</b> ${task.h2.replace(/^<p>|<\/p>$/g, '')}</div>`)); hints = 2; el.querySelector('[data-hint]').disabled = true; }
-    else if (k === 3 && !done) { box.appendChild(h(`<div class="key"><b class="ui">Решение.</b> ${task.sol}<p class="ui"><b>Ответ: ${esc(task.a)}</b></p></div>`)); finish(false); }
+    else if (k === 3 && !done) { box.appendChild(h(`<div class="key"><b class="ui">Решение.</b> ${task.sol}<p class="ui"><b>Ответ: ${esc(task.a)}</b></p>${task.crit ? `<details class="crit"><summary class="ui">Критерии ФИПИ: как оценят это решение (макс. ${task.max || 2} б.)</summary>${task.crit}</details>` : ''}</div>`)); finish(false); }
   };
   el.querySelector('[data-hint]').onclick = () => show(Math.min(2, hints + 1));
   el.querySelector('[data-sol]').onclick = () => show(3);

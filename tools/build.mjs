@@ -55,7 +55,7 @@ function buildNumber(dir, subject, num) {
     if (st !== 'ок' && st !== 'без_источника') warn.push(`${id}: задача ${t.id} без статуса проверки`);
     tasks.push({ id: t.id, type: t.тип, level: t.уровень || 1, q: inline(t.условие || ''), fig: t.рисунок ? camel(t.рисунок) : null,
       a: String(t.ответ), tol: t.допуск || null, h1: mdText(t.подсказка1), h2: mdText(t.подсказка2), sol: mdText(t.решение),
-      src: t.источник || null, known: !!t.уже_знаю || ctx.known.includes(t.id), say: speech(t.условие || '') });
+      src: t.источник || null, known: !!t.уже_знаю || ctx.known.includes(t.id), say: speech(t.условие || ''), crit: t.критерии ? mdText(t.критерии) : '', max: t.макс || null });
   }
   const bundle = { id, subject, num, meta, html, examples: ctx.examples, tasks, figures: figSrc, say: speech(src), built: new Date().toISOString() };
   const types = {}; for (const t of tasks) types[t.type] = (types[t.type] || 0) + 1;
