@@ -1,5 +1,5 @@
 {
- "v": "ef4a252bf4ae",
+ "v": "c4345fe09b6b",
  "files": [
   "catalog.bin",
   "df.bin",
@@ -27,6 +27,9 @@
   "f21.bin",
   "f22.bin",
   "f23.bin",
+  "f24.bin",
+  "f25.bin",
+  "f26.bin",
   "m01.bin",
   "m02.bin",
   "m03.bin",
