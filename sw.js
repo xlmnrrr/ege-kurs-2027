@@ -1,5 +1,5 @@
 // Офлайн: оболочка и все зашифрованные пакеты в кэше. VERSION подставляет tools/build.mjs — новая сборка = новый кэш.
-const VERSION = '8a37b0f9397a-7b6654ac';
+const VERSION = 'e8d480e71f27-c5ee3369';
 const CACHE = `ege-${VERSION}`;
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest',
@@ -16,8 +16,10 @@ const SHELL = [
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
-    await c.addAll(SHELL);
-    try { const v = await (await fetch('data/version.json', { cache: 'no-store' })).json(); await c.addAll(v.files.map((f) => `data/enc/${f}`)); } catch { /* пакеты докачаются по запросу */ }
+    // cache: 'reload' — мимо HTTP-кэша браузера: иначе в новый кэш попадает старая копия (GitHub Pages отдаёт max-age=600)
+    const fresh = (u) => new Request(u, { cache: 'reload' });
+    await c.addAll(SHELL.map(fresh));
+    try { const v = await (await fetch('data/version.json', { cache: 'no-store' })).json(); await c.addAll(v.files.map((f) => fresh(`data/enc/${f}`))); } catch { /* пакеты докачаются по запросу */ }
   })());
 });
 self.addEventListener('activate', (e) => {

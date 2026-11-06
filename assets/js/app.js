@@ -341,7 +341,8 @@ function startLook() {
 async function boot() {
   startLook();
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('sw.js').then((reg) => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+      reg.update().catch(() => {});   // проверить новую версию при каждом открытии, а не раз в сутки
       reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) w.postMessage('skip-waiting'); }); });
     }).catch(() => {});
     let reloading = false; const hadController = !!navigator.serviceWorker.controller;   // первая установка — не перезагружать

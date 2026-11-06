@@ -1,0 +1,45 @@
+# Деплой сайта в Yandex Object Storage при каждом пуше в main (GitHub Pages продолжает работать сам по себе).
+# Пока в Settings → Secrets and variables → Actions не задана переменная YC_BUCKET, шаг загрузки пропускается (не красный крестик).
+# Нужно: переменная YC_BUCKET (имя бакета сайта), секреты YC_ACCESS_KEY_ID и YC_SECRET_ACCESS_KEY (статический ключ сервисного аккаунта).
+name: deploy-yandex
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-yandex
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Проверка, что в публикацию не попадает незашифрованное
+        run: |
+          test -f data/version.json
+          if grep -rlq "подсказка1\|решение" data/enc; then echo "в data/enc открытый текст — не публикую"; exit 1; fi
+      - name: Загрузка в Object Storage
+        if: ${{ vars.YC_BUCKET != '' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.YC_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ru-central1
+          B: s3://${{ vars.YC_BUCKET }}
+          EP: https://storage.yandexcloud.net
+        run: |
+          set -e
+          # всё, кроме служебного; удалённые файлы удаляются и из бакета
+          aws s3 sync . "$B" --endpoint-url "$EP" --delete \
+            --exclude ".git/*" --exclude ".github/*" --exclude "tools/*" --exclude "backend/*" \
+            --exclude "*.md" --exclude ".gitignore" --exclude ".gitattributes" --exclude ".nojekyll" \
+            --cache-control "public, max-age=86400"
+          # то, что должно проверяться при каждом открытии: страница, сервис-воркер, версии и настройки
+          for f in index.html sw.js data/version.json data/keys.json data/config.json; do
+            aws s3 cp "$f" "$B/$f" --endpoint-url "$EP" --cache-control "no-cache"
+          done
+          aws s3 cp manifest.webmanifest "$B/manifest.webmanifest" --endpoint-url "$EP" --content-type "application/manifest+json" --cache-control "no-cache"
+          aws s3 cp data/enc "$B/data/enc" --recursive --endpoint-url "$EP" --content-type "application/octet-stream" --cache-control "public, max-age=86400"
+          echo "Готово: https://${{ vars.YC_BUCKET }}.website.yandexcloud.net"

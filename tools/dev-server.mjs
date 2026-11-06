@@ -68,6 +68,8 @@ function handleSync(req, res) {
 function handler(req, res) {
   const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p === '/sync' && req.method === 'POST') return handleSync(req, res);
+  // локально синхронизируемся со своим сервером, даже если в data/config.json адрес облачной функции (EGE_CLOUD_SYNC=1 — проверить облако)
+  if (p === '/data/config.json' && !process.env.EGE_CLOUD_SYNC) { res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end('{ "syncUrl": "/sync" }'); return; }
   let file = normalize(join(ROOT, p));
   if (!file.startsWith(ROOT + sep) && file !== ROOT) { res.writeHead(403).end(); return; }
   if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
