@@ -4,9 +4,6 @@ import * as store from './store.js';
 import { fold, dueReviews, streak, level, forecast, mastery, dayKey } from './progress.js';
 import { buildPlan, feasibility, DEFAULTS } from './plan.js';
 import { renderNumber, renderReview } from './number.js';
-import { renderRef } from './spravka.js';
-import { renderDiag } from './diag.js';
-import { openCalc } from './calc.js';
 import { sound } from './extras.js';
 import { startSync, syncNow, syncStatus } from './sync.js';
 
@@ -17,10 +14,22 @@ export const h = (html) => { const t = document.createElement('template'); t.inn
 export const SUBJ = { м: 'математика', ф: 'физика' }, LETTER = { математика: 'м', физика: 'ф' };
 export const numLink = (n) => `#/${LETTER[n.subject]}/${n.num}`;
 const ICON = {
+  today: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  math: '<path d="M5 7h14M9 7v11M15 7v8a3 3 0 0 0 3 3"/>',
+  phys: '<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8" transform="rotate(120 12 12)"/>',
+  book: '<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/>',
+  plan: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>',
+  note: '<path d="M6 3h12v18l-6-4-6 4z"/>',
+  diag: '<path d="M4 19h16M7 16V9M12 16V5M17 16v-4"/>',
+  redo: '<path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
   sound: '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>',
   calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11v6M8 15h2M12 15h2"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
 };
+const NAV = [['#/', 'today', 'Сегодня'], ['#/м', 'math', 'Математика'], ['#/ф', 'phys', 'Физика'], ['#/формулы', 'book', 'Формулы'], ['#/план', 'plan', 'План'], ['#/заметки', 'note', 'Заметки']];
+const NAV_EXTRA = [['#/диагностика', 'diag', 'Диагностика'], ['#/повтор', 'redo', 'Повторение ошибок'], ['#/настройки', 'gear', 'Настройки']];
 export const icon = (n) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[n] || ''}</svg>`;
 export function toast(text, ms = 2600) { const t = h(`<div class="toast" role="status">${esc(text)}</div>`); document.body.appendChild(t); setTimeout(() => t.remove(), ms); }
 
@@ -93,14 +102,21 @@ async function enter() {
 function header() {
   const top = $('#top'); top.hidden = false;
   top.innerHTML = `<div class="top-in">
-    <a class="brand" href="#/">ЕГЭ <span>2027</span></a>
-    <nav class="nav" aria-label="Разделы"><a href="#/">Сегодня</a><a href="#/м">Математика</a><a href="#/ф">Физика</a><a href="#/формулы">Формулы</a><a href="#/план">План</a><a href="#/заметки">Заметки</a></nav>
+    <button class="iconbtn burger" data-menu aria-label="Меню" aria-expanded="false" aria-controls="menu">${icon('menu')}</button>
+    <a class="brand" href="#/"><span class="lamp" aria-hidden="true"></span>ЕГЭ <b>2027</b></a>
+    <nav class="nav" id="menu" aria-label="Разделы">${NAV.map(([href, ic, t]) => `<a href="${href}">${icon(ic)}<span>${t}</span></a>`).join('')}
+      <div class="menu-extra">${NAV_EXTRA.map(([href, ic, t]) => `<a href="${href}">${icon(ic)}<span>${t}</span></a>`).join('')}</div></nav>
     <span class="sync-dot off" title="Синхронизация" aria-hidden="true"></span>
     <button class="iconbtn" data-sound aria-label="Звуки" aria-pressed="${sound.on}">${icon('sound')}</button>
     <button class="iconbtn" data-calc aria-label="Калькулятор">${icon('calc')}</button>
     <a class="iconbtn" href="#/настройки" aria-label="Настройки">${icon('gear')}</a></div>`;
   $('[data-sound]', top).onclick = (e) => { sound.toggle(); e.currentTarget.setAttribute('aria-pressed', sound.on); if (sound.on) sound.play('ok'); };
-  $('[data-calc]', top).onclick = () => openCalc();
+  $('[data-calc]', top).onclick = async () => (await import('./calc.js')).openCalc();
+  const burger = $('[data-menu]', top), menu = $('#menu', top);
+  const setMenu = (on) => { document.body.classList.toggle('menu-open', on); burger.setAttribute('aria-expanded', on); burger.innerHTML = icon(on ? 'close' : 'menu'); };
+  burger.onclick = () => setMenu(!document.body.classList.contains('menu-open'));
+  menu.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
 }
 export function setSyncDot(state) { const d = $('.sync-dot'); if (d) { d.className = `sync-dot ${state}`; d.title = { ok: 'Прогресс синхронизирован', wait: 'Есть неотправленный прогресс', off: 'Синхронизация недоступна — прогресс хранится на устройстве' }[state] || ''; } }
 
@@ -121,10 +137,10 @@ async function route() {
       view = n ? await renderNumber(App, n, parts[2] || 'задачи', parts[3]) : notFound();
     } else if (parts[0] === 'план') view = planView();
     else if (parts[0] === 'заметки') view = notesView();
-    else if (parts[0] === 'формулы') view = await renderRef(App, parts[1]);
+    else if (parts[0] === 'формулы') view = await (await import('./spravka.js')).renderRef(App, parts[1]);
     else if (parts[0] === 'настройки') view = settingsView();
     else if (parts[0] === 'повтор') view = await renderReview(App);
-    else if (parts[0] === 'диагностика') view = await renderDiag(App, parts[1]);
+    else if (parts[0] === 'диагностика') view = await (await import('./diag.js')).renderDiag(App, parts[1]);
     else view = notFound();
   } catch (e) { console.error(e); view = h(`<div class="page"><h1>Не открылось</h1><p class="lead">${esc(e.message)}. Обнови страницу; если повторится — проверь, что сайт обновился.</p></div>`); }
   main.innerHTML = ''; main.appendChild(view);
@@ -154,19 +170,29 @@ async function home() {
   const today = buildPlan(S, App.catalog, { days: 1, tasksById: App.tasksById, opts: planOpts() })[0];
   const fc = forecast(S, App.catalog, App.tasksById), st = streak(S, Date.now(), planOpts().studyDays), lv = level(S.xp);
   const due = dueReviews(S).length;
-  const v = h(`<div class="page" data-title="Сегодня"><div class="home">
-    <section class="today" aria-labelledby="today-h"><h1 id="today-h">${todayTitle(today)}</h1>
-      <p class="lead">До математики ${plural(daysTo(ex['математика']), 'день', 'дня', 'дней')}, до физики ${plural(daysTo(ex['физика']), 'день', 'дня', 'дней')}.</p>
-      <div class="blocks">${(today.blocks || []).map(blockHTML).join('') || '<p class="muted">Сегодня по плану отдых. Можно повторить ошибки или решить пару задач.</p>'}</div>
-      ${Object.keys(S.diag).length ? '' : '<div class="key ui">Сначала пройди <a href="#/диагностика">диагностику</a>: по 1–2 задачи на каждый номер. План начнёт со слабых номеров.</div>'}
-      <div class="row"><a class="btn primary" href="${Object.keys(S.diag).length ? startHref(today, due) : '#/диагностика'}">${Object.keys(S.diag).length ? 'Начать занятие' : 'Пройти диагностику'}</a>${due ? `<a class="btn" href="#/повтор">Повторить ошибки: ${due}</a>` : ''}</div>
-      <div class="stats" style="margin-top:var(--s5)">
-        ${['математика', 'физика'].map((s) => `<div class="stat"><div class="v">${fc[s].test}</div><div class="l">${s}: прогноз баллов (цель 90)</div><div class="bar"><i style="width:${Math.min(100, (fc[s].test / 90) * 100)}%"></i></div></div>`).join('')}
-        <div class="stat"><div class="v">${st}</div><div class="l">серия учебных дней</div></div>
-        <div class="stat"><div class="v">${lv.lv}</div><div class="l">уровень · опыт ${lv.xp} из ${lv.next}</div><div class="bar"><i style="width:${((lv.xp - lv.prev) / (lv.next - lv.prev)) * 100}%"></i></div></div>
+  const dm = daysTo(ex['математика']), df = daysTo(ex['физика']), hasDiag = Object.keys(S.diag).length > 0;
+  const mins = (today.blocks || []).reduce((a, b) => a + (b.minutes || 0), 0);
+  const date = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const v = h(`<div class="page" data-title="Сегодня"><div class="home2">
+    <header class="hero"><p class="eyebrow">${esc(date)}</p><h1 id="today-h">${today.kind === 'rest' ? 'Сегодня отдых' : today.kind === 'mock' ? 'Сегодня пробник' : 'План на сегодня'}</h1>
+      <p class="lead">${mins ? `${mins} минут занятий. ` : ''}Сначала задачи — теория открывается прямо в задаче.</p></header>
+    <div class="home-grid">
+      <div class="col-main">
+        ${hasDiag ? '' : `<section class="callout"><div><b>Начни с диагностики</b><p>По 1–2 задачи на каждый номер — план начнёт со слабых мест.</p></div><a class="btn primary" href="#/диагностика">Пройти диагностику</a></section>`}
+        <section class="card plan" aria-labelledby="plan-h"><div class="card-h"><h2 id="plan-h">Занятие</h2><span class="muted ui">${mins ? mins + ' мин' : ''}</span></div>
+          <ol class="timeline">${(today.blocks || []).map(blockHTML).join('') || '<li class="muted">Сегодня по плану отдых. Можно повторить ошибки или решить пару задач.</li>'}</ol>
+          <div class="row"><a class="btn primary" href="${hasDiag ? startHref(today, due) : '#/диагностика'}">${hasDiag ? 'Начать занятие' : 'Сначала диагностика'}</a>${due ? `<a class="btn" href="#/повтор">Повторить ошибки: ${due}</a>` : ''}</div></section>
+        ${progressMap()}
       </div>
-      <p class="muted ui" style="font-size:13px;margin-top:var(--s3)">Прогноз = освоенные номера × их баллы по шкале 2026 (шкала 2027 выйдет весной).</p>
-    </section>${progressMap()}</div></div>`);
+      <aside class="col-side">
+        <section class="card countdown" aria-label="До экзаменов"><div class="cd"><b>${dm}</b><span>${plural(dm, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до математики</span><small>${new Date(ex['математика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div>
+          <div class="cd"><b>${df}</b><span>${plural(df, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до физики</span><small>${new Date(ex['физика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div></section>
+        <section class="card forecast"><div class="card-h"><h2>Прогноз баллов</h2><span class="muted ui">цель 90</span></div>
+          ${['математика', 'физика'].map((sj) => `<div class="fc"><div class="fc-r"><span>${sj === 'математика' ? 'Математика' : 'Физика'}</span><b>${fc[sj].test}</b></div><div class="bar"><i style="width:${Math.min(100, (fc[sj].test / 90) * 100)}%"></i><em style="left:${(90 / 100) * 100}%"></em></div></div>`).join('')}
+          <p class="muted ui small">Освоенные номера × баллы по шкале 2026.</p></section>
+        <section class="card mini"><div><b>${st}</b><span>серия дней</span></div><div><b>${lv.lv}</b><span>уровень</span><div class="bar"><i style="width:${((lv.xp - lv.prev) / (lv.next - lv.prev)) * 100}%"></i></div></div></section>
+      </aside>
+    </div></div></div>`);
   v.querySelector('#pmap').addEventListener('toggle', (e) => { try { localStorage.setItem('pmap', e.target.open ? '1' : '0'); } catch { /* приватный режим */ } });
   return v;
 }
@@ -182,7 +208,7 @@ function blockHTML(b) {
   const what = b.kind === 'review' ? `Повторение ошибок${b.count ? ` — ${plural(b.count, 'задача', 'задачи', 'задач')}` : ' — пока нечего повторять, реши пару задач прошлых номеров'}`
     : b.kind === 'number' && n ? `<a href="${numLink(n)}">${n.subject === 'математика' ? 'Математика' : 'Физика'}, №${n.num}. ${esc(n.title)}</a> — ${b.stage === 'с нуля' ? '«Проверить себя» → задачи по типам, теория — кнопкой в задаче' : 'продолжаем задачи по типам'}${n.hasContent ? '' : ' <span class="muted">(разбор готовится)</span>'}`
       : b.kind === 'mock' ? `Пробник на 235 минут: ${b.subject}` : `Смешанные задачи: ${b.subject}`;
-  return `<div class="block"><span class="min">${b.minutes} мин</span><span>${what}</span></div>`;
+  return `<li class="tl"><span class="min">${b.minutes}<small>мин</small></span><span class="what">${what}</span></li>`;
 }
 function startHref(d, due) {
   if (due) return '#/повтор';
@@ -295,8 +321,14 @@ function settingsView() {
 async function boot() {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('sw.js').then((reg) => {
-      reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) toast('Доступна новая версия курса — обнови страницу', 6000); }); });
+      reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) w.postMessage('skip-waiting'); }); });
     }).catch(() => {});
+    let reloading = false; const hadController = !!navigator.serviceWorker.controller;   // первая установка — не перезагружать
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading || !hadController) return;
+      if (/\/(тип|проверка)/.test(decodeURIComponent(location.hash))) { toast('Курс обновлён — новая версия откроется при переходе', 5000); return; }
+      reloading = true; location.reload();
+    });
   }
   try {
     App.keys = await (await fetch('data/keys.json', { cache: 'no-store' })).json();

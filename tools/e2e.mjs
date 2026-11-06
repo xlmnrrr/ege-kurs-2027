@@ -48,7 +48,7 @@ try {
   await login(p);
   ok(await p.until(`!!document.querySelector('#pmap')`, 10000), 'верный пароль: главная с картой номеров');
   ok((await p.run(`document.querySelectorAll('#pmap .nchip').length`)) === 46, 'в карте номеров 46 номеров (20 + 26)');
-  ok(await p.run(`document.querySelectorAll('.today .block').length === 3`), 'план на сегодня: 3 блока (повторение, номер, смешанные)');
+  ok(await p.run(`document.querySelectorAll('.timeline .tl').length === 3`), 'план на сегодня: 3 блока (повторение, номер, смешанные)');
   ok(await noHScroll(p), 'главная 393 px: без горизонтальной прокрутки');
   await shot(p, 'iphone-home');
   // запоминание устройства

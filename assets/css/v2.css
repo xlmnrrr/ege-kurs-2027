@@ -1,0 +1,94 @@
+/* ===================== ДИЗАЙН v2 «Вечерняя лампа» (06.11): свет лампы, крупнее на ПК, бургер на телефоне =====================
+   Подключается после base.css и уточняет его. Токены — tokens.css. */
+body { background:
+    radial-gradient(1100px 620px at 8% -12%, color-mix(in srgb, var(--primary) 13%, transparent), transparent 62%),
+    radial-gradient(900px 520px at 105% -5%, color-mix(in srgb, var(--blue) 8%, transparent), transparent 60%),
+    var(--bg);
+  background-attachment: fixed; }
+@media (min-width: 1200px) { :root { --fs-ui: 16px; --fs-small: 14px; --page: 1280px; } .page { padding-top: var(--s6); } }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+
+/* шапка и бренд */
+.top { background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px) saturate(1.2); -webkit-backdrop-filter: blur(12px) saturate(1.2); }
+.top-in { min-height: 60px; gap: var(--s3); }
+.brand { display: inline-flex; align-items: center; gap: 10px; font: 700 18px/1 var(--font-text); letter-spacing: .01em; }
+.brand b { color: var(--primary); font-weight: 700; }
+.lamp { width: 12px; height: 12px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent), 0 0 18px 4px color-mix(in srgb, var(--primary) 45%, transparent); }
+.nav svg { display: none; }
+.nav a { position: relative; font-weight: 500; }
+.nav a[aria-current="page"] { background: transparent; color: var(--text); }
+.nav a[aria-current="page"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 2px; height: 2px; border-radius: 2px; background: var(--primary); }
+.menu-extra { display: none; }
+.burger { display: none; }
+
+/* телефон: нижней панели больше нет — бургер-меню сверху */
+@media (max-width: 760px) {
+  body { padding-bottom: 0; }
+  .toast { bottom: calc(20px + env(safe-area-inset-bottom)); }
+  .burger { display: inline-grid; margin-left: -8px; }
+  .brand { flex: 1; font-size: 17px; }
+  .nav { position: fixed; left: 0; right: 0; top: 56px; bottom: auto; max-height: calc(100dvh - 56px); overflow-y: auto; z-index: 40;
+    flex-direction: column; justify-content: flex-start; gap: 2px; padding: 10px 12px calc(16px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    box-shadow: 0 24px 40px rgba(0, 0, 0, .45); opacity: 0; transform: translateY(-8px); pointer-events: none; transition: opacity var(--t-ui), transform var(--t-ui); }
+  body.menu-open .nav { opacity: 1; transform: none; pointer-events: auto; }
+  body.menu-open { overflow: hidden; }
+  .nav a { display: flex; align-items: center; gap: 14px; text-align: left; padding: 14px 12px; font-size: 17px; border-radius: 12px; flex: none; }
+  .nav a[aria-current="page"] { background: var(--surface); }
+  .nav a[aria-current="page"]::after { display: none; }
+  .nav svg { display: block; width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; color: var(--primary); flex: none; }
+  .menu-extra { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .menu-extra svg { color: var(--muted); }
+  .solve-nav { bottom: 0 !important; }
+  .top .iconbtn[data-sound] { display: none; }
+}
+
+/* общие карточки, кнопки, вкладки */
+.card { background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, white), var(--surface)); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: var(--r-panel); padding: var(--s4) var(--s5); }
+.card-h { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); margin-bottom: var(--s3); }
+.card-h h2 { margin: 0; font: 600 20px/1.2 var(--font-text); }
+.btn { transition: transform var(--t-fast), box-shadow var(--t-fast), background var(--t-fast), border-color var(--t-fast); }
+.btn.primary { box-shadow: 0 6px 22px -8px color-mix(in srgb, var(--primary) 70%, transparent); }
+.btn.primary:hover { transform: translateY(-1px); box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--primary) 80%, transparent); }
+.small { font-size: 13px; }
+@media (max-width: 760px) { .tabs { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); } }
+
+/* главная v2 */
+.home2 .hero { margin-bottom: var(--s5); }
+.eyebrow { margin: 0 0 6px; font: 600 13px/1 var(--font-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--primary); }
+.home2 h1 { margin: 0 0 6px; font-size: clamp(30px, 2.4vw + 16px, 44px); }
+.home-grid { display: grid; gap: var(--s4); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1000px) { .home-grid { grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); align-items: start; } .col-side { position: sticky; top: 84px; } }
+.col-main, .col-side { display: grid; gap: var(--s4); align-content: start; min-width: 0; }
+.callout { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); padding: 18px 20px; border-radius: var(--r-panel);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--primary) 18%, var(--surface)), var(--surface) 75%); border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--line)); font-family: var(--font-ui); }
+.callout b { font-size: 17px; }
+.callout p { margin: 4px 0 0; color: var(--muted); }
+.timeline { list-style: none; margin: 0 0 var(--s4); padding: 0; display: grid; gap: 10px; }
+.tl { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--s3); align-items: center; padding: 12px 14px; border-radius: var(--r-field); background: var(--bg); font: 15px/1.45 var(--font-ui); }
+.tl .min { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 52px; border-radius: 12px; background: color-mix(in srgb, var(--primary) 14%, var(--surface)); color: var(--primary); font: 700 20px/1 var(--font-ui); font-variant-numeric: tabular-nums; }
+.tl .min small { font-size: 11px; font-weight: 500; margin-top: 3px; color: var(--muted); }
+.tl .what a { color: var(--text); font-weight: 600; text-decoration-color: color-mix(in srgb, var(--primary) 60%, transparent); text-underline-offset: 3px; }
+.countdown { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); padding: var(--s4); }
+.cd { display: flex; flex-direction: column; padding: 12px 14px; border-radius: var(--r-field); background: var(--bg); font-family: var(--font-ui); }
+.cd b { font: 700 40px/1 var(--font-text); color: var(--primary); font-variant-numeric: tabular-nums; }
+.cd:last-child b { color: var(--blue); }
+.cd span { margin-top: 6px; font-size: 14px; }
+.cd small { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.forecast .fc { margin-bottom: 14px; font-family: var(--font-ui); }
+.fc-r { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.fc-r b { font: 700 24px/1 var(--font-ui); }
+.forecast .bar { position: relative; height: 8px; overflow: visible; }
+.forecast .bar i { border-radius: 4px; }
+.forecast .bar em { position: absolute; top: -4px; width: 2px; height: 16px; background: var(--text); opacity: .5; border-radius: 1px; }
+.mini { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); font-family: var(--font-ui); }
+.mini > div { padding: 10px 12px; border-radius: var(--r-field); background: var(--bg); }
+.mini b { display: block; font: 700 28px/1 var(--font-ui); }
+.mini span { color: var(--muted); font-size: 13px; }
+.mini .bar { margin-top: 8px; }
+.pmap { border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+@media (max-width: 760px) { .callout { flex-direction: column; align-items: stretch; } .card { padding: var(--s4); } .cd b { font-size: 34px; } }
+
+/* номер и задачи: крупнее на ПК */
+@media (min-width: 1200px) { .task .q { font-size: 20px; } .type-card { padding: 18px 20px; } .type-card .what { font-size: 14px; } }
+.num-head h1 { margin-bottom: 4px; }
