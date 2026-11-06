@@ -105,3 +105,27 @@ body { background:
   .doc.theory > nav.toc a { background: transparent; border-radius: 8px; font-size: 14px; padding: 6px 10px; }
   .doc.theory > nav.toc a:hover { background: var(--surface2); color: var(--text); }
 }
+
+/* список номеров: класс статуса .work совпадал с раскладкой «задача + доска» — плитки «в работе» разъезжались */
+.num, .num.work { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: var(--s3); align-items: center; padding: 16px 18px; min-height: 84px;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); transition: border-color var(--t-fast), transform var(--t-fast), background var(--t-fast); }
+.num:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--surface) 92%, white); }
+.num .n { font: 700 26px/1 var(--font-text); text-align: center; }
+.num .t { font-size: 16px; }
+.num .s { display: inline-block; margin-top: 3px; }
+.num .st { padding: 4px 9px; border-radius: 999px; background: var(--bg); white-space: nowrap; }
+.num.work .st { color: var(--blue); } .num.done .st { color: var(--primary); }
+.num.work { box-shadow: inset 3px 0 0 var(--blue); } .num.done { box-shadow: inset 3px 0 0 var(--primary); }
+@media (min-width: 1200px) { .nums { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; } }
+
+/* справочник на ПК: оглавление — закреплённая колонка слева, текст шире; поиск над текстом */
+@media (min-width: 1200px) {
+  .page.ref { display: grid; grid-template-columns: 250px minmax(0, 1fr); column-gap: var(--s6); align-items: start; }
+  .page.ref > * { grid-column: 1 / -1; }
+  .page.ref > nav.toc { grid-column: 1; grid-row: span 3; position: sticky; top: 132px; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 2px; margin: 0;
+    max-height: calc(100vh - 150px); overflow-y: auto; padding: 10px; border-radius: var(--r-panel); background: var(--surface); }
+  .page.ref > nav.toc a { background: transparent; border-radius: 8px; font-size: 13.5px; line-height: 1.3; padding: 7px 10px; white-space: normal; }
+  .page.ref > nav.toc a:hover { background: var(--surface2); color: var(--text); }
+  .page.ref > .ref-doc, .page.ref > .empty { grid-column: 2; max-width: 900px; }
+  .ref-doc { font-size: 18px; }
+}

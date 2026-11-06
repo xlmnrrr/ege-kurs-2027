@@ -226,7 +226,7 @@ export function statusOf(n) {
 function subjectView(subject) {
   const nums = App.catalog.filter((n) => n.subject === subject);
   const card = (n) => { const st = statusOf(n); return `<a class="num ${st === 'done' ? 'done' : st === 'work' ? 'work' : ''} ${n.hasContent ? '' : 'soon'}" href="${numLink(n)}">
-    <span class="n">${n.num}</span><span><span class="t">${esc(n.title)}${n.isNew ? ' · новое' : ''}</span><br><span class="s">${plural(n.points, 'балл', 'балла', 'баллов')} · ~${n.minutes} мин${n.pct2026 ? ` · решают ${Math.round(n.pct2026)} %` : ''}</span></span>
+    <span class="n">${n.num}</span><span><span class="t">${esc(n.title)}${n.isNew ? ' · новое' : ''}</span><br><span class="s">${plural(n.points, 'балл', 'балла', 'баллов')} · ~${n.minutes} мин${n.pct2026 ? ` · решают ${Math.round(n.pct2026)}&nbsp;%` : ''}</span></span>
     <span class="st">${n.hasContent ? { done: 'освоен', work: 'в работе', new: 'не начат' }[st] : 'скоро'}</span></a>`; };
   return h(`<div class="page" data-title="${subject}"><h1>${subject === 'математика' ? 'Математика · профиль' : 'Физика'}</h1>
     <p class="lead">${subject === 'математика' ? '20 заданий, 33 первичных балла, 235 минут (ЕГЭ-2027).' : '26 заданий, 45 первичных баллов, 235 минут (ЕГЭ-2027).'}</p>
