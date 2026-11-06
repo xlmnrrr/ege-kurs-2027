@@ -62,5 +62,13 @@ ok(f['математика'].ok && f['физика'].ok, `времени хва�
 const fc = forecast(empty, catalog);
 ok(fc['математика'].max === 33 && fc['физика'].max === 45, 'максимумы первичных 33 и 45');
 
+{ // сброс прогресса: предмет и всё
+  const E = (t, type, data) => ({ id: type + t, t, type, data });
+  const ev = [E(1, 'answer', { task: 'm01-t1-01', num: 'm01', ok: true }), E(2, 'answer', { task: 'f01-t1-01', num: 'f01', ok: true }), E(3, 'note', { key: 'm01', text: 'x' }), E(4, 'diag', { num: 'm02', level: 2 })];
+  const sm = fold([...ev, E(5, 'reset', { scope: 'математика' })]);
+  ok(!sm.tasks['m01-t1-01'] && !!sm.tasks['f01-t1-01'] && !sm.notes.m01 && !sm.diag.m02 && sm.xp === 10, 'сброс математики: физика и её опыт остались');
+  const sa = fold([...ev, E(5, 'reset', { scope: 'всё' }), E(6, 'answer', { task: 'm03-t1-01', num: 'm03', ok: true })]);
+  ok(Object.keys(sa.tasks).join() === 'm03-t1-01' && sa.xp === 10, 'полный сброс: учитываются только события после него');
+}
 console.log(`\n${n - fail}/${n} проверок пройдено`);
 process.exit(fail ? 1 : 0);

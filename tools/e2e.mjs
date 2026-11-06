@@ -44,15 +44,15 @@ try {
   await login(p, 'неверный-пароль');
   await p.until(`document.querySelector('.lock .err')?.textContent.length > 5`, 8000);
   ok((await p.run(`document.querySelector('.lock .err').textContent`)).includes('Пароль не подошёл'), 'неверный пароль: понятное сообщение');
-  ok(!(await p.run(`!!document.querySelector('#orbits')`)), 'неверный пароль: курс не открылся');
+  ok(!(await p.run(`!!document.querySelector('#pmap')`)), 'неверный пароль: курс не открылся');
   await login(p);
-  ok(await p.until(`!!document.querySelector('#orbits .ch-pt')`, 10000), 'верный пароль: главная с орбитами');
-  ok((await p.run(`document.querySelectorAll('#orbits .ch-pt.node').length`)) === 46, 'на орбитах 46 номеров (20 + 26)');
+  ok(await p.until(`!!document.querySelector('#pmap')`, 10000), 'верный пароль: главная с картой номеров');
+  ok((await p.run(`document.querySelectorAll('#pmap .nchip').length`)) === 46, 'в карте номеров 46 номеров (20 + 26)');
   ok(await p.run(`document.querySelectorAll('.today .block').length === 3`), 'план на сегодня: 3 блока (повторение, номер, смешанные)');
   ok(await noHScroll(p), 'главная 393 px: без горизонтальной прокрутки');
   await shot(p, 'iphone-home');
   // запоминание устройства
-  await p.open(BASE); ok(await p.until(`!!document.querySelector('#orbits')`, 10000), 'после перезагрузки вход не нужен (устройство запомнено)');
+  await p.open(BASE); ok(await p.until(`!!document.querySelector('#pmap')`, 10000), 'после перезагрузки вход не нужен (устройство запомнено)');
   // номер: экран «Задачи» — карточки типов и «Проверить себя»
   await p.run(`location.hash='#/м/1'`); ok(await p.until(`document.querySelectorAll('.type-card').length >= 5`, 10000), 'номер 1: карточки типов задач');
   ok(await p.run(`!!document.querySelector('.check-card a[href$="/проверка"]')`), 'номер 1: «Проверить себя»');
@@ -82,6 +82,12 @@ try {
     if (last) break;
   }
   ok((await p.run(`document.querySelector('.page h2')?.textContent || ''`)).startsWith(`${kn} из ${kn}`), `«Проверить себя»: ${kn} из ${kn} с первой попытки`);
+  // справочник формул: разделы, рисунки, поиск
+  await p.run(`location.hash='#/формулы/геометрия'`); await p.until(`document.querySelectorAll('.ref-sec').length >= 5`, 10000);
+  ok(await p.run(`!!document.querySelector('.ref-doc figure.fig svg .ch-line') && document.querySelectorAll('.ref-doc .katex').length > 50`), 'справочник: разделы, формулы и рисунки');
+  await p.run(`(()=>{const i=document.querySelector('.ref-tools input'); i.value='синус'; i.dispatchEvent(new Event('input'));})()`); await sleep(200);
+  ok(await p.run(`[...document.querySelectorAll('.ref-sec')].filter(s=>!s.hidden).length < document.querySelectorAll('.ref-sec').length`), 'справочник: поиск оставляет только нужное');
+  ok(await noHScroll(p), 'справочник 393 px: без горизонтальной прокрутки');
   // экран задачи: черновик и панель теории
   await p.run(`location.hash='#/м/1/тип/t1'`); await p.until(`!!document.querySelector('.task')`, 8000);
   ok(await p.run(`document.querySelectorAll('.board .bd-stage canvas').length === 3 && !!document.querySelector('.board [data-act=fig]')`), 'у задачи есть черновик (кисть, рисунок, клетки)');
@@ -133,18 +139,19 @@ try {
   // офлайн (Service Worker)
   await p.run(`navigator.serviceWorker.ready.then(()=>1)`); await sleep(1500);
   await p.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
-  await p.open(BASE); const offlineOk = await p.until(`!!document.querySelector('#orbits')`, 10000);
+  await p.open(BASE); const offlineOk = await p.until(`!!document.querySelector('#pmap')`, 10000);
   ok(offlineOk, 'офлайн: курс открывается без сети (Service Worker)');
   await p.run(`location.hash='#/м/1'`); ok(await p.until(`!!document.querySelector('.type-card')`, 8000), 'офлайн: номер открывается из кэша');
   await p.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
   // выход
   await sleep(1500); await p.open(BASE + encodeURI('#/настройки')); await p.until(`!!document.querySelector('[data-logout]')`, 8000);
+  ok(await p.run(`!!document.querySelector('[data-reset][disabled]') && document.querySelector('[data-rq]').textContent.includes('сколько будет')`), 'настройки: сброс прогресса с проверочным примером');
   await p.run(`document.querySelector('[data-logout]').click()`); ok(await p.until(`!!document.querySelector('input[type=password]')`, 8000), 'выход на устройстве — снова экран пароля');
 
   // ---------- устройство B: ПК, синхронизация ----------
   const B = await launch();
   const q = await newTab(B, { w: 1440, h: 900, dpr: 1, mobile: false });
-  await q.open(BASE); await login(q); await q.until(`!!document.querySelector('#orbits')`, 10000);
+  await q.open(BASE); await login(q); await q.until(`!!document.querySelector('#pmap')`, 10000);
   await q.run(`import('./assets/js/sync.js').then(m=>m.syncNow(true))`); await sleep(800);
   const tasksB = await q.run(`import('./assets/js/store.js').then(s=>s.all('events')).then(ev=>ev.filter(e=>e.type==='answer').length)`);
   ok(tasksB >= 2, `синхронизация: ПК получил ответы с iPhone (${tasksB})`);

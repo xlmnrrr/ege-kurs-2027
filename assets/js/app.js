@@ -4,9 +4,10 @@ import * as store from './store.js';
 import { fold, dueReviews, streak, level, forecast, mastery, dayKey } from './progress.js';
 import { buildPlan, feasibility, DEFAULTS } from './plan.js';
 import { renderNumber, renderReview } from './number.js';
+import { renderRef } from './spravka.js';
 import { renderDiag } from './diag.js';
 import { openCalc } from './calc.js';
-import { sound, orbits } from './extras.js';
+import { sound } from './extras.js';
 import { startSync, syncNow, syncStatus } from './sync.js';
 
 export const App = { K: null, keys: null, catalog: [], bundles: {}, tasksById: {}, S: fold([]), version: null };
@@ -93,7 +94,7 @@ function header() {
   const top = $('#top'); top.hidden = false;
   top.innerHTML = `<div class="top-in">
     <a class="brand" href="#/">ЕГЭ <span>2027</span></a>
-    <nav class="nav" aria-label="Разделы"><a href="#/">Сегодня</a><a href="#/м">Математика</a><a href="#/ф">Физика</a><a href="#/план">План</a><a href="#/заметки">Заметки</a></nav>
+    <nav class="nav" aria-label="Разделы"><a href="#/">Сегодня</a><a href="#/м">Математика</a><a href="#/ф">Физика</a><a href="#/формулы">Формулы</a><a href="#/план">План</a><a href="#/заметки">Заметки</a></nav>
     <span class="sync-dot off" title="Синхронизация" aria-hidden="true"></span>
     <button class="iconbtn" data-sound aria-label="Звуки" aria-pressed="${sound.on}">${icon('sound')}</button>
     <button class="iconbtn" data-calc aria-label="Калькулятор">${icon('calc')}</button>
@@ -120,6 +121,7 @@ async function route() {
       view = n ? await renderNumber(App, n, parts[2] || 'задачи', parts[3]) : notFound();
     } else if (parts[0] === 'план') view = planView();
     else if (parts[0] === 'заметки') view = notesView();
+    else if (parts[0] === 'формулы') view = await renderRef(App, parts[1]);
     else if (parts[0] === 'настройки') view = settingsView();
     else if (parts[0] === 'повтор') view = await renderReview(App);
     else if (parts[0] === 'диагностика') view = await renderDiag(App, parts[1]);
@@ -135,14 +137,24 @@ const notFound = () => h('<div class="page"><h1>Такой страницы не
 // ---------- главная ----------
 const daysTo = (iso) => { const [y, m, d] = iso.split('-').map(Number); return Math.ceil((new Date(y, m - 1, d) - new Date().setHours(0, 0, 0, 0)) / 86400000); };
 const plural = (n, a, b, c) => { const m = n % 10, mm = n % 100; return `${n} ${m === 1 && mm !== 11 ? a : m >= 2 && m <= 4 && (mm < 10 || mm >= 20) ? b : c}`; };
+/** Карта номеров: сворачиваемая таблица «не начат / в работе / освоен» по предметам (вместо 3D-орбит, решение 06.11) */
+function progressMap() {
+  const ST = [['new', 'Не начато'], ['work', 'В работе'], ['done', 'Освоено']];
+  const by = {}; for (const n of App.catalog) (by[n.subject + statusOf(n)] ||= []).push(n);
+  const cnt = (k) => App.catalog.filter((n) => statusOf(n) === k).length;
+  const chip = (n) => `<a class="nchip ${statusOf(n)}" href="${numLink(n)}" title="${esc(n.title)}"><b>${n.num}</b><span>${esc(n.title)}</span></a>`;
+  let open = false; try { open = localStorage.getItem('pmap') === '1'; } catch { /* приватный режим */ }
+  return `<details class="pmap" id="pmap"${open ? ' open' : ''}>
+    <summary><span class="pm-t">Карта номеров</span><span class="pm-c"><i class="done"></i>освоено ${cnt('done')}<i class="work"></i>в работе ${cnt('work')}<i class="new"></i>не начато ${cnt('new')}</span></summary>
+    <div class="pm-body">${['математика', 'физика'].map((sub) => `<div class="pm-sub"><h3>${sub === 'математика' ? 'Математика · профиль' : 'Физика'}</h3>
+      <div class="pm-grid">${ST.map(([k, t]) => `<div class="pm-col"><div class="pm-h">${t} · ${(by[sub + k] || []).length}</div><div class="pm-list">${(by[sub + k] || []).map(chip).join('') || '<span class="muted ui">—</span>'}</div></div>`).join('')}</div></div>`).join('')}</div></details>`;
+}
 async function home() {
   const S = App.S, ex = planOpts().exams;
   const today = buildPlan(S, App.catalog, { days: 1, tasksById: App.tasksById, opts: planOpts() })[0];
   const fc = forecast(S, App.catalog, App.tasksById), st = streak(S, Date.now(), planOpts().studyDays), lv = level(S.xp);
   const due = dueReviews(S).length;
   const v = h(`<div class="page" data-title="Сегодня"><div class="home">
-    <section aria-label="Карта подготовки"><div class="orbits-wrap"><svg id="orbits" role="img" aria-label="Две орбиты: 20 номеров математики и 26 номеров физики; цвет — насколько номер освоен"></svg>
-      <div class="orbits-legend"><span><i style="background:var(--line-strong)"></i>не начат</span><span><i style="background:var(--blue)"></i>в работе</span><span><i style="background:var(--primary)"></i>освоен</span><span>Нажми на номер, чтобы открыть</span></div></div></section>
     <section class="today" aria-labelledby="today-h"><h1 id="today-h">${todayTitle(today)}</h1>
       <p class="lead">До математики ${plural(daysTo(ex['математика']), 'день', 'дня', 'дней')}, до физики ${plural(daysTo(ex['физика']), 'день', 'дня', 'дней')}.</p>
       <div class="blocks">${(today.blocks || []).map(blockHTML).join('') || '<p class="muted">Сегодня по плану отдых. Можно повторить ошибки или решить пару задач.</p>'}</div>
@@ -154,8 +166,8 @@ async function home() {
         <div class="stat"><div class="v">${lv.lv}</div><div class="l">уровень · опыт ${lv.xp} из ${lv.next}</div><div class="bar"><i style="width:${((lv.xp - lv.prev) / (lv.next - lv.prev)) * 100}%"></i></div></div>
       </div>
       <p class="muted ui" style="font-size:13px;margin-top:var(--s3)">Прогноз = освоенные номера × их баллы по шкале 2026 (шкала 2027 выйдет весной).</p>
-    </section></div></div>`);
-  requestAnimationFrame(() => orbits($('#orbits', v), App.catalog, (n) => statusOf(n), (n) => { location.hash = numLink(n); }));
+    </section>${progressMap()}</div></div>`);
+  v.querySelector('#pmap').addEventListener('toggle', (e) => { try { localStorage.setItem('pmap', e.target.open ? '1' : '0'); } catch { /* приватный режим */ } });
   return v;
 }
 function todayTitle(d) {
@@ -241,10 +253,31 @@ function settingsView() {
       <p class="muted ui" style="font-size:14px">Кнопка «Прочитать вслух» в номере использует встроенный голос браузера (на iPhone — голос Siri, работает без интернета).</p></div>
     <div class="card"><h3>Прогресс</h3><p class="ui">Событий в журнале: ${App.S ? Object.keys(App.S.tasks).length : 0} задач решалось. Можно сохранить копию прогресса в файл и восстановить на другом устройстве.</p>
       <div class="row"><button class="btn" data-export>Сохранить прогресс в файл</button><label class="btn">Загрузить из файла<input type="file" accept=".json" data-import hidden></label></div></div>
+    <div class="card danger-zone"><h3>Сбросить прогресс</h3><p class="ui">Решённые задачи, повторение, диагностика, заметки, закладки, лист формул и черновики — как будто сайт только создан. Сброс попадёт и на другие устройства при синхронизации. Отменить нельзя — сначала можно сохранить прогресс в файл.</p>
+      <div class="row"><label class="field" style="min-width:200px">Что сбросить<select class="input" data-rscope><option value="математика">Только математику</option><option value="физика">Только физику</option><option value="всё">Весь прогресс</option></select></label>
+      <label class="field" style="min-width:200px"><span data-rq></span><input class="input" inputmode="numeric" data-rans autocomplete="off"></label></div>
+      <div class="row" style="margin-top:var(--s2)"><button class="btn danger" data-reset disabled>Сбросить</button><span class="muted ui" data-rmsg></span></div></div>
     <div class="card"><h3>Пароль и устройство</h3><p class="ui">Пароль меняется на компьютере командой <code>node tools/set-password.mjs</code> (контент перешифровывать не нужно). Это устройство ${App.K ? 'запомнено' : 'не запомнено'}.</p>
       <button class="btn" data-logout>Выйти на этом устройстве</button></div>
     <p class="muted ui" style="font-size:13px">Версия контента: ${esc(App.version?.v || '—')}</p></div>`);
   $('[data-sync]', v).onclick = async () => { await syncNow(true); route(); };
+  { // сброс прогресса с проверочным примером (капча), чтобы не нажать случайно
+    const x = 11 + Math.floor(Math.random() * 30), y = 7 + Math.floor(Math.random() * 20);
+    $('[data-rq]', v).textContent = `Проверка: сколько будет ${x} + ${y}?`;
+    const ans = $('[data-rans]', v), btn = $('[data-reset]', v);
+    ans.oninput = () => { btn.disabled = +ans.value.trim() !== x + y; };
+    btn.onclick = async () => {
+      const scope = $('[data-rscope]', v).value;
+      if (+ans.value.trim() !== x + y) return;
+      await record('reset', { scope });
+      try { // черновики на этом устройстве
+        const pre = scope === 'физика' ? /^доска:(диаг:d-)?f\d/ : scope === 'математика' ? /^доска:(диаг:d-)?m\d/ : /^доска:/;
+        for (const k of Object.keys(localStorage)) if (pre.test(k)) localStorage.removeItem(k);
+      } catch { /* приватный режим */ }
+      toast(scope === 'всё' ? 'Весь прогресс сброшен' : `Прогресс по предмету «${scope}» сброшен`);
+      route();
+    };
+  }
   $('[data-snd]', v).onchange = (e) => { sound.set(e.target.checked); document.querySelector('[data-sound]')?.setAttribute('aria-pressed', sound.on); };
   $('[data-export]', v).onclick = async () => {
     const evs = await store.all('events');

@@ -99,6 +99,22 @@ async function main() {
       console.log(`${did}: диагностика ${subject}, задач ${tasks.length}, ${(bin.length / 1024).toFixed(0)} КБ`);
     }
   }
+  // справочник: контент\справочник\{алгебра,геометрия,физика}.md (+ общий рисунки.js) -> sp-a.bin, sp-g.bin, sp-f.bin
+  const spdir = join(CONTENT, 'справочник');
+  if (existsSync(spdir)) {
+    const figSrc = existsSync(join(spdir, 'рисунки.js')) ? readFileSync(join(spdir, 'рисунки.js'), 'utf8') : '';
+    const figNames = new Set([...figSrc.matchAll(/export\s+function\s+([\p{L}\d_$]+)/gu)].map((m) => m[1]));
+    const camel = (s) => s.replace(/-([\p{L}\d])/gu, (_, c) => c.toUpperCase());
+    for (const [name, sid] of [['алгебра', 'sp-a'], ['геометрия', 'sp-g'], ['физика', 'sp-f']]) {
+      const f = join(spdir, name + '.md');
+      if (!existsSync(f) || (only.length && !only.includes(sid))) continue;
+      const ctx = { id: sid, examples: [], known: [], figNames: { has: (k) => figNames.has(camel(k)) } };
+      const { meta, html } = md(readFileSync(f, 'utf8'), (t, a, b) => blockHTML(t, a, b, ctx));
+      const bin = await seal(K, gzipSync(Buffer.from(JSON.stringify({ id: sid, title: meta.название || name, html, figures: html.includes('data-fig') ? figSrc : '' })), { level: 9 }));
+      writeFileSync(join(OUT, `${sid}.bin`), bin);
+      console.log(`${sid}: справочник «${meta.название || name}», ${(bin.length / 1024).toFixed(0)} КБ`);
+    }
+  }
   const catalog = catalogBase.map((n) => ({ ...n, ...(infos[n.id] && !infos[n.id].keep ? infos[n.id] : {}), hasContent: !!infos[n.id] }));
   const cat = await seal(K, gzipSync(Buffer.from(JSON.stringify({ numbers: catalog, built: new Date().toISOString() })), { level: 9 }));
   writeFileSync(join(OUT, 'catalog.bin'), cat);

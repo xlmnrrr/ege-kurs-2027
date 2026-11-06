@@ -15,7 +15,7 @@ export function fold(events) {
         const t = (s.tasks[d.task] ||= { attempts: 0, correct: 0, last: null, hints: 0, srs: null, num: d.num });
         t.attempts++; t.num ||= d.num; t.hints = d.hints || 0;
         t.last = { ok: !!d.ok, t: e.t, hints: d.hints || 0, given: d.given };
-        if (d.ok) { t.correct++; s.xp += d.hints || d.tries ? 5 : 10; }
+        if (d.ok) { const g = d.hints || d.tries ? 5 : 10; t.correct++; s.xp += g; t.xp = (t.xp || 0) + g; }
         // повторение (одна запись = одна попытка решить задачу; data: ok, hints, tries — неверных вводов до ответа):
         // любая трудность (неверно, подсказка, неверный ввод) -> стадия 0, повтор завтра;
         // чисто верно в день срока или позже -> следующий интервал 3, 7, 21; после 21 — освоено
@@ -37,6 +37,15 @@ export function fold(events) {
       case 'day': (s.days[d.date] ||= { minutes: 0, tasks: 0 }).minutes += d.minutes || 0; break;
       case 'mock': s.mocks.push({ ...d, t: e.t }); break;
       case 'setting': s.settings[d.key] = d.value; break;
+      case 'reset': { // сброс прогресса: всё (как новый сайт, настройки остаются) или один предмет; события после сброса считаются заново
+        if (d.scope === 'всё') { const keep = s.settings; Object.assign(s, { tasks: {}, numbers: {}, notes: {}, marks: {}, formulas: {}, days: {}, mocks: [], diag: {}, xp: 0 }); s.settings = keep; break; }
+        const pre = d.scope === 'физика' ? 'f' : 'm', sp = d.scope === 'физика' ? ['sp-f'] : ['sp-a', 'sp-g'];
+        const hit = (k) => (k.startsWith(pre) && /^[mf]\d/.test(k)) || sp.some((x) => k.startsWith(x));
+        for (const [id, t] of Object.entries(s.tasks)) if (hit(t.num || id)) { s.xp = Math.max(0, s.xp - (t.xp || 0)); delete s.tasks[id]; }
+        for (const o of [s.numbers, s.diag, s.notes, s.marks, s.formulas]) for (const k of Object.keys(o)) if (hit(k)) delete o[k];
+        s.mocks = s.mocks.filter((m) => m.subject && m.subject !== d.scope);
+        break;
+      }
     }
   }
   return s;
