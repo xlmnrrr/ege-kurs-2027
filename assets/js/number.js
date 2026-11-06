@@ -70,6 +70,11 @@ export function checkAnswer(given, task) {
   if (task.tol) { const [c, d] = normalize(task.tol).split('±').map(num); const x = num(g); return !Number.isNaN(x) && Math.abs(x - c) <= d + 1e-12; }
   const x = num(g), y = num(a);
   if (!Number.isNaN(x) && !Number.isNaN(y)) return Math.abs(x - y) < 1e-9;
+  if (a.includes(';')) {   // несколько чисел: «2,4;0,2», допускаем «2,4±0,2», «2,4+-0,2», «2,4/0,2»
+    const gs = g.replace(/\+-|±|\//g, ';').split(';'), as = a.split(';');
+    if (g === as.join('')) return true;   // как на бланке ЕГЭ: «4,60,1» — значение и погрешность слитно
+    return gs.length === as.length && as.every((v, k) => { const p = num(gs[k]), q = num(v); return Number.isNaN(q) ? gs[k] === v : !Number.isNaN(p) && Math.abs(p - q) < 1e-9; });
+  }
   return g === a;
 }
 
