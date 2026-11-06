@@ -129,3 +129,85 @@ body { background:
   .page.ref > .ref-doc, .page.ref > .empty { grid-column: 2; max-width: 900px; }
   .ref-doc { font-size: 18px; }
 }
+
+/* ===================== v3 «Лампа над тетрадью» (06.11): живой фон, свет на карточках, появление, 3D-сечение ===================== */
+#bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; }
+#bg.on { opacity: 1; }
+::selection { background: color-mix(in srgb, var(--primary) 38%, transparent); color: var(--text); }
+html { scrollbar-color: var(--line) transparent; }
+@media print { #bg, .solid { display: none !important; } }
+
+/* шапка на ПК — парящая панель */
+@media (min-width: 761px) {
+  .top { background: transparent; border-bottom: 0; backdrop-filter: none; -webkit-backdrop-filter: none; padding: 8px 12px 0; }
+  .top-in { border-radius: 16px; background: color-mix(in srgb, var(--bg) 76%, transparent); backdrop-filter: blur(14px) saturate(1.25); -webkit-backdrop-filter: blur(14px) saturate(1.25);
+    border: 1px solid color-mix(in srgb, var(--line) 75%, transparent); box-shadow: 0 10px 30px -18px rgba(0, 0, 0, .7); padding: 6px 10px 6px 16px; }
+  .board { top: 84px; } .ref-tools { top: 76px; }
+  .page.ref > nav.toc { top: 148px !important; max-height: calc(100vh - 164px) !important; }
+}
+
+/* поверхности: свет лампы чуть проходит сквозь; задача, доска, панели — плотные */
+.card, .pmap, .num, .type-card, .callout, .check-card, .list .item, .day, .ref-cards > a {
+  background-color: color-mix(in srgb, var(--surface) 88%, transparent); }
+.card { background-image: linear-gradient(180deg, color-mix(in srgb, white 3%, transparent), transparent 60%); }
+.task, .board, .dw, .calc { background: var(--surface); }
+.dw { background: var(--bg); }
+
+/* свет на карточке под курсором */
+:where(.card, .num, .type-card, .callout, .check-card, .pmap, .ref-cards > a, .task, .nchip) { position: relative; }
+:where(.card, .num, .type-card, .callout, .check-card, .pmap, .ref-cards > a, .task, .nchip)::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .35s ease;
+  background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--primary) 11%, transparent), transparent 62%); }
+.lit::after { opacity: 1; }
+.lit:is(.num, .type-card, .callout, .check-card, .pmap) { border-color: color-mix(in srgb, var(--primary) 32%, var(--line)); }
+.task.lit::after { background: radial-gradient(520px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--primary) 5%, transparent), transparent 65%); }
+
+/* появление */
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+.fx-in { animation: rise .42s var(--ease) backwards; animation-delay: calc(var(--i, 0) * 34ms); }
+@keyframes grow { from { transform: scaleX(0); } }
+.bar > i, .bar i { transform-origin: left center; animation: grow .9s var(--ease) .15s backwards; }
+@property --p { syntax: '<number>'; inherits: false; initial-value: 0; }
+@keyframes ringfill { from { --p: 0; } }
+.ring { animation: ringfill 1.1s var(--ease) .1s backwards; }
+
+/* 3D-сечение */
+.solid { margin: 0; display: grid; gap: 4px; justify-items: center; }
+.solid canvas { width: 100%; aspect-ratio: 1.12; display: block; cursor: grab; touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
+.solid canvas:active { cursor: grabbing; }
+.solid figcaption { display: flex; align-items: center; gap: 6px; font: 13px/1.3 var(--font-ui); color: var(--muted); text-align: center; min-height: 32px; }
+.sc { font-variant-numeric: tabular-nums; }
+.sc-next { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; flex: none; }
+.sc-next:hover { color: var(--primary); border-color: var(--primary); }
+
+/* главная: герой с многогранником */
+.home2 .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: var(--s5); align-items: center; }
+.hero-stats { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: var(--s3); font: 15px/1.3 var(--font-ui); color: var(--muted); }
+.hero-stats b { color: var(--text); font: 700 22px/1 var(--font-text); margin-right: 4px; font-variant-numeric: tabular-nums; }
+.hero-stats span:first-child b { color: var(--primary); } .hero-stats span:nth-child(2) b { color: var(--blue); }
+@media (min-width: 1200px) { .home2 h1 { font-size: 52px; } }
+@media (max-width: 760px) {
+  .home2 .hero { grid-template-columns: minmax(0, 1fr) 128px; gap: var(--s3); align-items: start; }
+  .home2 .hero .solid figcaption { display: none; }
+  .hero-stats { gap: 6px 14px; font-size: 13px; } .hero-stats b { font-size: 18px; }
+}
+
+/* вход: панель над живой тетрадью */
+.lock-box { background: color-mix(in srgb, var(--surface) 80%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 22px;
+  padding: 26px 28px 30px; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .8); }
+.lock-solid { width: min(280px, 100%); margin: -6px auto 8px; }
+.lock h1 { font-size: clamp(30px, 3vw + 14px, 40px); }
+
+/* страница предмета */
+.sub-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s5); align-items: center; margin-bottom: var(--s4); }
+.sub-hero h1 { font-size: clamp(32px, 2.6vw + 16px, 48px); margin-bottom: 6px; }
+.sub-hero .lead { margin-bottom: var(--s3); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--muted); }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+.legend i.done { background: var(--primary); } .legend i.work { background: var(--blue); } .legend i.new { background: var(--line-strong); }
+.ring.big { width: 128px; height: 128px; } .ring.big span { width: 104px; height: 104px; font-size: 26px; font-family: var(--font-text); }
+.ring.big small { font: 400 12px var(--font-ui); margin-top: 2px; }
+.ring span { background: color-mix(in srgb, var(--bg) 92%, transparent); }
+.part-h { display: flex; align-items: center; gap: 14px; text-transform: uppercase; letter-spacing: .08em; font-size: 12.5px; margin-top: var(--s6); }
+.part-h::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
+@media (max-width: 760px) { .sub-hero { grid-template-columns: minmax(0, 1fr) 96px; gap: var(--s3); } .ring.big { width: 96px; height: 96px; display: grid; } .ring.big span { width: 78px; height: 78px; font-size: 20px; } }

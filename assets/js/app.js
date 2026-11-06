@@ -6,6 +6,8 @@ import { buildPlan, feasibility, DEFAULTS } from './plan.js';
 import { renderNumber, renderReview } from './number.js';
 import { sound } from './extras.js';
 import { startSync, syncNow, syncStatus } from './sync.js';
+import { enter as fxEnter, initLight } from './fx.js';
+import { mountSolid, solidHTML } from './solid.js';
 
 export const App = { K: null, keys: null, catalog: [], bundles: {}, tasksById: {}, S: fold([]), version: null };
 const $ = (s, r = document) => r.querySelector(s);
@@ -54,10 +56,7 @@ function lockView() {
   const main = $('#main');
   main.innerHTML = '';
   const v = h(`<div class="lock"><div class="lock-box">
-    <svg class="lock-art" viewBox="0 0 320 120" aria-hidden="true"><g fill="none" stroke-linecap="round">
-      <ellipse cx="160" cy="62" rx="140" ry="34" stroke="var(--blue)" stroke-opacity=".55" stroke-width="1.6" transform="rotate(-8 160 62)"/>
-      <ellipse cx="160" cy="62" rx="118" ry="44" stroke="var(--primary)" stroke-opacity=".7" stroke-width="1.6" transform="rotate(14 160 62)"/>
-      <circle cx="160" cy="62" r="7" fill="var(--primary)"/></g></svg>
+    ${solidHTML('lock-solid')}
     <h1>ЕГЭ курс 2027</h1><p class="lead">Математика профиль и физика. Курс зашифрован — введи пароль.</p>
     <form autocomplete="on">
       <input type="text" name="username" autocomplete="username" value="ege-kurs-2027" hidden aria-hidden="true">
@@ -67,6 +66,7 @@ function lockView() {
       <button class="btn primary" type="submit">Открыть курс</button>
     </form></div></div>`);
   main.appendChild(v);
+  mountSolid($('.solid', v)); fxEnter(v); setView(false);
   const form = $('form', v), err = $('.err', v), btn = $('button', v);
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -145,12 +145,18 @@ async function route() {
   } catch (e) { console.error(e); view = h(`<div class="page"><h1>Не открылось</h1><p class="lead">${esc(e.message)}. Обнови страницу; если повторится — проверь, что сайт обновился.</p></div>`); }
   main.innerHTML = ''; main.appendChild(view);
   scrollTo(0, 0);
+  setView((SUBJ[parts[0]] && parts[1]) || ['повтор', 'заметки'].includes(parts[0]) || (parts[0] === 'формулы' && parts[1]) || (parts[0] === 'диагностика' && parts[1]));
+  view.querySelectorAll('.solid').forEach(mountSolid);
+  fxEnter(view);
   document.title = (view.dataset.title ? view.dataset.title + ' — ' : '') + 'ЕГЭ курс 2027';
   main.focus({ preventScroll: true });
 }
+/** Страница чтения — фон спокойный и неподвижный (bg.js слушает ege-view) */
+function setView(read) { const v = read ? 'read' : 'open'; if (document.documentElement.dataset.view !== v) { document.documentElement.dataset.view = v; dispatchEvent(new Event('ege-view')); } }
 const notFound = () => h('<div class="page"><h1>Такой страницы нет</h1><p><a href="#/">На главную</a></p></div>');
 
 // ---------- главная ----------
+const mastered = (sub) => App.catalog.filter((n) => n.subject === sub && statusOf(n) === 'done').length;
 const daysTo = (iso) => { const [y, m, d] = iso.split('-').map(Number); return Math.ceil((new Date(y, m - 1, d) - new Date().setHours(0, 0, 0, 0)) / 86400000); };
 const plural = (n, a, b, c) => { const m = n % 10, mm = n % 100; return `${n} ${m === 1 && mm !== 11 ? a : m >= 2 && m <= 4 && (mm < 10 || mm >= 20) ? b : c}`; };
 /** Карта номеров: сворачиваемая таблица «не начат / в работе / освоен» по предметам (вместо 3D-орбит, решение 06.11) */
@@ -174,8 +180,10 @@ async function home() {
   const mins = (today.blocks || []).reduce((a, b) => a + (b.minutes || 0), 0);
   const date = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
   const v = h(`<div class="page" data-title="Сегодня"><div class="home2">
-    <header class="hero"><p class="eyebrow">${esc(date)}</p><h1 id="today-h">${today.kind === 'rest' ? 'Сегодня отдых' : today.kind === 'mock' ? 'Сегодня пробник' : 'План на сегодня'}</h1>
-      <p class="lead">${mins ? `${mins} минут занятий. ` : ''}Сначала задачи — теория открывается прямо в задаче.</p></header>
+    <header class="hero"><div class="hero-t"><p class="eyebrow">${esc(date)}</p><h1 id="today-h">${today.kind === 'rest' ? 'Сегодня отдых' : today.kind === 'mock' ? 'Сегодня пробник' : 'План на сегодня'}</h1>
+      <p class="lead">${mins ? `${mins} минут занятий. ` : ''}Сначала задачи — теория открывается прямо в задаче.</p>
+      <div class="hero-stats"><span><b data-count="${mastered('математика')}">${mastered('математика')}</b> из 20 по математике</span><span><b data-count="${mastered('физика')}">${mastered('физика')}</b> из 26 по физике</span><span><b data-count="${S.xp}">${S.xp}</b> опыта</span></div></div>
+      ${solidHTML()}</header>
     <div class="home-grid">
       <div class="col-main">
         ${hasDiag ? '' : `<section class="callout"><div><b>Начни с диагностики</b><p>По 1–2 задачи на каждый номер — план начнёт со слабых мест.</p></div><a class="btn primary" href="#/диагностика">Пройти диагностику</a></section>`}
@@ -185,12 +193,12 @@ async function home() {
         ${progressMap()}
       </div>
       <aside class="col-side">
-        <section class="card countdown" aria-label="До экзаменов"><div class="cd"><b>${dm}</b><span>${plural(dm, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до математики</span><small>${new Date(ex['математика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div>
-          <div class="cd"><b>${df}</b><span>${plural(df, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до физики</span><small>${new Date(ex['физика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div></section>
+        <section class="card countdown" aria-label="До экзаменов"><div class="cd"><b data-count="${dm}">${dm}</b><span>${plural(dm, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до математики</span><small>${new Date(ex['математика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div>
+          <div class="cd"><b data-count="${df}">${df}</b><span>${plural(df, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до физики</span><small>${new Date(ex['физика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div></section>
         <section class="card forecast"><div class="card-h"><h2>Прогноз баллов</h2><span class="muted ui">цель 90</span></div>
-          ${['математика', 'физика'].map((sj) => `<div class="fc"><div class="fc-r"><span>${sj === 'математика' ? 'Математика' : 'Физика'}</span><b>${fc[sj].test}</b></div><div class="bar"><i style="width:${Math.min(100, fc[sj].test)}%"></i><em style="left:90%" title="цель 90"></em></div></div>`).join('')}
+          ${['математика', 'физика'].map((sj) => `<div class="fc"><div class="fc-r"><span>${sj === 'математика' ? 'Математика' : 'Физика'}</span><b data-count="${fc[sj].test}">${fc[sj].test}</b></div><div class="bar"><i style="width:${Math.min(100, fc[sj].test)}%"></i><em style="left:90%" title="цель 90"></em></div></div>`).join('')}
           <p class="muted ui small">Освоенные номера × баллы по шкале 2026.</p></section>
-        <section class="card mini"><div><b>${st}</b><span>серия дней</span></div><div><b>${lv.lv}</b><span>уровень</span><div class="bar"><i style="width:${((lv.xp - lv.prev) / (lv.next - lv.prev)) * 100}%"></i></div></div></section>
+        <section class="card mini"><div><b data-count="${st}">${st}</b><span>серия дней</span></div><div><b>${lv.lv}</b><span>уровень</span><div class="bar"><i style="width:${((lv.xp - lv.prev) / (lv.next - lv.prev)) * 100}%"></i></div></div></section>
       </aside>
     </div></div></div>`);
   v.querySelector('#pmap').addEventListener('toggle', (e) => { try { localStorage.setItem('pmap', e.target.open ? '1' : '0'); } catch { /* приватный режим */ } });
@@ -228,8 +236,12 @@ function subjectView(subject) {
   const card = (n) => { const st = statusOf(n); return `<a class="num ${st === 'done' ? 'done' : st === 'work' ? 'work' : ''} ${n.hasContent ? '' : 'soon'}" href="${numLink(n)}">
     <span class="n">${n.num}</span><span><span class="t">${esc(n.title)}${n.isNew ? ' · новое' : ''}</span><br><span class="s">${plural(n.points, 'балл', 'балла', 'баллов')} · ~${n.minutes} мин${n.pct2026 ? ` · решают ${Math.round(n.pct2026)}&nbsp;%` : ''}</span></span>
     <span class="st">${n.hasContent ? { done: 'освоен', work: 'в работе', new: 'не начат' }[st] : 'скоро'}</span></a>`; };
-  return h(`<div class="page" data-title="${subject}"><h1>${subject === 'математика' ? 'Математика · профиль' : 'Физика'}</h1>
-    <p class="lead">${subject === 'математика' ? '20 заданий, 33 первичных балла, 235 минут (ЕГЭ-2027).' : '26 заданий, 45 первичных баллов, 235 минут (ЕГЭ-2027).'}</p>
+  const cnt = { done: 0, work: 0, new: 0 }; nums.forEach((n) => cnt[statusOf(n)]++);
+  const pct = Math.round((cnt.done / nums.length) * 100), ready = nums.filter((n) => n.hasContent).length;
+  return h(`<div class="page" data-title="${subject}"><div class="sub-hero"><div><p class="eyebrow">${subject === 'математика' ? 'ЕГЭ-2027 · профиль' : 'ЕГЭ-2027'}</p><h1>${subject === 'математика' ? 'Математика' : 'Физика'}</h1>
+    <p class="lead">${subject === 'математика' ? '20 заданий, 33 первичных балла, 235 минут.' : '26 заданий, 45 первичных баллов, 235 минут.'} Разборов готово: ${ready} из ${nums.length}.</p>
+    <div class="legend ui"><span><i class="done"></i>освоено ${cnt.done}</span><span><i class="work"></i>в работе ${cnt.work}</span><span><i class="new"></i>не начато ${cnt.new}</span></div></div>
+    <div class="ring big" style="--p:${pct}"><span>${pct}%<small>освоено</small></span></div></div>
     <h2 class="part-h">Часть 1</h2><div class="nums">${nums.filter((n) => n.part === 1).map(card).join('')}</div>
     <h2 class="part-h">Часть 2 — развёрнутый ответ</h2><div class="nums">${nums.filter((n) => n.part === 2).map(card).join('')}</div></div>`);
 }
@@ -275,6 +287,8 @@ function settingsView() {
   const ss = syncStatus();
   const v = h(`<div class="page prose" data-title="Настройки"><h1>Настройки</h1>
     <div class="card"><h3>Синхронизация ПК ↔ iPhone</h3><p class="ui">${esc(ss.text)}</p><div class="row"><button class="btn" data-sync>Синхронизировать сейчас</button></div></div>
+    <div class="card"><h3>Вид</h3><label class="field" style="max-width:340px">Фон<select class="input" data-bg><option value="live">Живой — лампа под курсором</option><option value="still">Неподвижный — тетрадь без движения</option><option value="off">Без фона</option></select></label>
+      <p class="muted ui" style="font-size:14px;margin-top:8px">Хранится на этом устройстве. На страницах с задачами и теорией фон сам становится спокойным.</p></div>
     <div class="card"><h3>Звук и озвучка</h3><label class="check"><input type="checkbox" data-snd ${sound.on ? 'checked' : ''}> Тихие звуки (верно, серия, уровень)</label>
       <p class="muted ui" style="font-size:14px">Кнопка «Прочитать вслух» в номере использует встроенный голос браузера (на iPhone — голос Siri, работает без интернета).</p></div>
     <div class="card"><h3>Прогресс</h3><p class="ui">Событий в журнале: ${App.S ? Object.keys(App.S.tasks).length : 0} задач решалось. Можно сохранить копию прогресса в файл и восстановить на другом устройстве.</p>
@@ -304,6 +318,7 @@ function settingsView() {
       route();
     };
   }
+  { const sel = $('[data-bg]', v); import('./bg.js').then((m) => { sel.value = m.bgMode(); sel.onchange = () => { try { localStorage.setItem('ege-bg', sel.value); } catch { /* приватный режим */ } m.startBg(sel.value); toast('Фон: ' + sel.selectedOptions[0].textContent.split(' —')[0].toLowerCase()); }; }); }
   $('[data-snd]', v).onchange = (e) => { sound.set(e.target.checked); document.querySelector('[data-sound]')?.setAttribute('aria-pressed', sound.on); };
   $('[data-export]', v).onclick = async () => {
     const evs = await store.all('events');
@@ -318,7 +333,13 @@ function settingsView() {
 }
 
 // ---------- запуск ----------
+function startLook() {
+  initLight();
+  const go = () => import('./bg.js').then((m) => m.startBg()).catch((e) => console.warn('фон', e));
+  if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 1200 }); else setTimeout(go, 400);
+}
 async function boot() {
+  startLook();
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('sw.js').then((reg) => {
       reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) w.postMessage('skip-waiting'); }); });
