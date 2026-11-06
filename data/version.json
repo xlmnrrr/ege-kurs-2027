@@ -1,5 +1,5 @@
 {
- "v": "9481045ec03a",
+ "v": "d4da7dd6ebd3",
  "files": [
   "catalog.bin",
   "df.bin",
@@ -9,6 +9,7 @@
   "f03.bin",
   "f04.bin",
   "f05.bin",
+  "f06.bin",
   "m01.bin",
   "m02.bin",
   "m03.bin",
