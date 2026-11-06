@@ -92,3 +92,16 @@ body { background:
 /* номер и задачи: крупнее на ПК */
 @media (min-width: 1200px) { .task .q { font-size: 20px; } .type-card { padding: 18px 20px; } .type-card .what { font-size: 14px; } }
 .num-head h1 { margin-bottom: 4px; }
+
+.callout .btn { white-space: nowrap; flex: none; }
+
+/* номер: крошки спокойные; теория на широком экране — текст + закреплённое оглавление справа */
+.num-head p a, .crumbs a { color: var(--muted); text-decoration: none; }
+.num-head p a:hover, .crumbs a:hover { color: var(--text); }
+@media (min-width: 1200px) {
+  .doc.theory { display: grid; grid-template-columns: minmax(0, 760px) 260px; column-gap: var(--s6); align-items: start; max-width: none; }
+  .doc.theory > * { grid-column: 1; }
+  .doc.theory > nav.toc { grid-column: 2; grid-row: 1 / span 60; position: sticky; top: 84px; flex-direction: column; flex-wrap: nowrap; gap: 4px; margin: 0; padding: 12px; border-radius: var(--r-panel); background: var(--surface); }
+  .doc.theory > nav.toc a { background: transparent; border-radius: 8px; font-size: 14px; padding: 6px 10px; }
+  .doc.theory > nav.toc a:hover { background: var(--surface2); color: var(--text); }
+}

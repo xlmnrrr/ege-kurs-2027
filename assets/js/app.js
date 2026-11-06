@@ -188,7 +188,7 @@ async function home() {
         <section class="card countdown" aria-label="До экзаменов"><div class="cd"><b>${dm}</b><span>${plural(dm, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до математики</span><small>${new Date(ex['математика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div>
           <div class="cd"><b>${df}</b><span>${plural(df, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до физики</span><small>${new Date(ex['физика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div></section>
         <section class="card forecast"><div class="card-h"><h2>Прогноз баллов</h2><span class="muted ui">цель 90</span></div>
-          ${['математика', 'физика'].map((sj) => `<div class="fc"><div class="fc-r"><span>${sj === 'математика' ? 'Математика' : 'Физика'}</span><b>${fc[sj].test}</b></div><div class="bar"><i style="width:${Math.min(100, (fc[sj].test / 90) * 100)}%"></i><em style="left:${(90 / 100) * 100}%"></em></div></div>`).join('')}
+          ${['математика', 'физика'].map((sj) => `<div class="fc"><div class="fc-r"><span>${sj === 'математика' ? 'Математика' : 'Физика'}</span><b>${fc[sj].test}</b></div><div class="bar"><i style="width:${Math.min(100, fc[sj].test)}%"></i><em style="left:90%" title="цель 90"></em></div></div>`).join('')}
           <p class="muted ui small">Освоенные номера × баллы по шкале 2026.</p></section>
         <section class="card mini"><div><b>${st}</b><span>серия дней</span></div><div><b>${lv.lv}</b><span>уровень</span><div class="bar"><i style="width:${((lv.xp - lv.prev) / (lv.next - lv.prev)) * 100}%"></i></div></div></section>
       </aside>
