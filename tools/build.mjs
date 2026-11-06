@@ -53,7 +53,7 @@ function buildNumber(dir, subject, num) {
     const st = t.проверка?.статус;
     if (st === 'спорная') { warn.push(`${id}: задача ${t.id} спорная — не публикуется`); continue; }
     if (st !== 'ок' && st !== 'без_источника') warn.push(`${id}: задача ${t.id} без статуса проверки`);
-    tasks.push({ id: t.id, type: t.тип, level: t.уровень || 1, q: inline(t.условие || ''), fig: t.рисунок ? camel(t.рисунок) : null,
+    tasks.push({ id: t.id, type: t.тип, level: t.уровень || 1, q: mdText(t.условие || ''), fig: t.рисунок ? camel(t.рисунок) : null,
       a: String(t.ответ), tol: t.допуск || null, h1: mdText(t.подсказка1), h2: mdText(t.подсказка2), sol: mdText(t.решение),
       src: t.источник || null, known: !!t.уже_знаю || ctx.known.includes(t.id), say: speech(t.условие || ''), crit: t.критерии ? mdText(t.критерии) : '', max: t.макс || null });
   }
@@ -92,7 +92,7 @@ async function main() {
       const f = join(ddir, `${subject}.json`);
       if (!existsSync(f) || (only.length && !only.includes(did))) continue;
       const raw = JSON.parse(readFileSync(f, 'utf8'));
-      const tasks = raw.filter((t) => t.проверка?.статус !== 'спорная').map((t) => ({ id: t.id, num: t.номер_id, part: t.часть, q: inline(t.условие), a: String(t.ответ ?? ''), tol: t.допуск || null,
+      const tasks = raw.filter((t) => t.проверка?.статус !== 'спорная').map((t) => ({ id: t.id, num: t.номер_id, part: t.часть, q: mdText(t.условие), a: String(t.ответ ?? ''), tol: t.допуск || null,
         fig: t.рисунок ? camel(t.рисунок) : null, sol: mdText(t.решение), criteria: t.критерии ? mdText(t.критерии) : '', max: t.макс || 1, src: t.источник || null }));
       const bin = await seal(K, gzipSync(Buffer.from(JSON.stringify({ id: did, subject, tasks, figures: figSrc })), { level: 9 }));
       writeFileSync(join(OUT, `${did}.bin`), bin);

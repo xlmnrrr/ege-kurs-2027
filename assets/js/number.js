@@ -77,10 +77,10 @@ export function checkAnswer(given, task) {
 function parseDoc(html) {
   const tmp = document.createElement('div'); tmp.innerHTML = html;
   tmp.querySelector('.known-slot')?.remove();
-  const out = { intro: [], theory: [], types: [], traps: [], tail: [] };
+  const out = { intro: [], theory: [], types: [], traps: [], tail: [], formulas: '' };
   let h2 = '', cur = null;
   for (const node of [...tmp.children]) {
-    if (node.tagName === 'H2') { h2 = node.textContent.trim(); cur = null; if (!/^(Теория|Типы задач|Ловушки|Что проверяет)/.test(h2)) out.tail.push(node.outerHTML); continue; }
+    if (node.tagName === 'H2') { h2 = node.textContent.trim(); cur = null; if (!/^(Теория|Типы задач|Ловушки|Что проверяет|Формулы)/.test(h2)) out.tail.push(node.outerHTML); continue; }
     if (h2.startsWith('Что проверяет')) { out.intro.push(node.outerHTML); continue; }
     if (h2 === 'Теория') {
       if (node.tagName === 'H3') { cur = { title: node.textContent.trim(), html: '' }; out.theory.push(cur); } else if (cur) cur.html += node.outerHTML; else out.intro.push(node.outerHTML);
@@ -90,6 +90,7 @@ function parseDoc(html) {
       if (node.tagName === 'H3') { const m = node.textContent.match(/Тип\s+(\d+)\.\s*(.*)/); cur = { id: 't' + (m ? m[1] : out.types.length + 1), title: m ? m[2] : node.textContent, html: '' }; out.types.push(cur); } else if (cur) cur.html += node.outerHTML;
       continue;
     }
+    if (h2 === 'Формулы') { out.formulas += node.outerHTML; continue; }
     if (h2 === 'Ловушки') { if (node.matches('.trap')) out.traps.push(node.outerHTML); continue; }
     out.tail.push(node.outerHTML);
   }
@@ -129,7 +130,7 @@ function taskCard(task, numId, figs, opt = {}) {
     <div class="q">${task.q}</div>
     ${task.fig && figs[task.fig] ? '<figure class="fig"><svg role="img" aria-label="Рисунок к задаче"></svg></figure>' : ''}
     <form class="answer" autocomplete="off"><label class="sr" for="a-${esc(task.id)}">Ответ</label><input class="input" id="a-${esc(task.id)}" inputmode="decimal" placeholder="Ответ"><button class="btn primary" type="submit">Проверить</button></form>
-    <div class="tools"><button class="btn" data-hint>Подсказка</button>${opt.onTheory ? '<button class="btn" data-theory>Теория</button>' : ''}<button class="btn quiet" data-sol>Решение</button></div>
+    <div class="tools"><button class="btn" data-hint>Подсказка</button>${opt.onTheory ? '<button class="btn" data-theory>Теория</button>' : ''}${opt.onFormulas ? '<button class="btn" data-formulas>Формулы</button>' : ''}<button class="btn quiet" data-sol>Решение</button></div>
     <div class="res" aria-live="polite"></div><div class="hints"></div>
     ${srcTxt ? `<p class="src">Источник: ${srcTxt}</p>` : ''}</article>`);
   if (task.fig && figs[task.fig]) { const ch = makeFigure(figs[task.fig], el.querySelector('figure svg')); ch.setStep(0, true); }
@@ -143,6 +144,7 @@ function taskCard(task, numId, figs, opt = {}) {
   el.querySelector('[data-hint]').onclick = () => show(Math.min(2, hints + 1));
   el.querySelector('[data-sol]').onclick = () => show(3);
   if (opt.onTheory) el.querySelector('[data-theory]').onclick = opt.onTheory;
+  if (opt.onFormulas) el.querySelector('[data-formulas]').onclick = opt.onFormulas;
   el.querySelector('[data-say]').onclick = () => speak(task.say);
   async function finish(ok) {
     if (done) return; done = true;
@@ -183,6 +185,7 @@ function solveScreen(host, list, ctx) {
       <div class="dots" aria-hidden="true">${list.map((x, k) => `<i class="${App.S.tasks[x.id]?.last?.ok ? 'ok' : ''} ${k === i ? 'cur' : ''}"></i>`).join('')}</div></div>`));
     const card = taskCard(t, n.id, figs, {
       onTheory: ty ? () => openTheory(ty) : null,
+      onFormulas: doc.formulas ? () => theoryPanel().open(`Формулы №${n.num}`, `<div class="formulas">${doc.formulas}</div>`) : null,
       onFinish: (ok) => { if (ok && !card.dataset.tried) firstTry++; host.querySelector('[data-next]')?.focus(); },
     });
     card.querySelector('form').addEventListener('submit', () => { card.dataset.tried = card.dataset.tried || (card.querySelector('.result.bad') ? '1' : ''); }, true);
@@ -254,6 +257,7 @@ export async function renderNumber(App_, n, tab, arg) {
   if (tab === 'ловушки') { body.innerHTML = `<div class="doc">${doc.traps.join('') || '<p class="empty">Ловушек нет.</p>'}</div>`; return v; }
   // теория (и шпаргалка — вся теория + типы с примерами в последнем шаге)
   const art = h(`<article class="doc theory">${doc.intro.join('')}
+    ${doc.formulas ? `<details class="formulas-box" ${tab === 'шпаргалка' ? 'open' : ''}><summary class="ui">Формулы номера</summary><div class="formulas">${doc.formulas}</div></details>` : ''}
     <nav class="toc no-print">${doc.theory.map((s, k) => `<a href="#" data-go="${k}">${esc(s.title)}</a>`).join('')}</nav>
     ${doc.theory.map((s, k) => `<section class="th-sec" id="th-${k}"><h3>${esc(s.title)}</h3>${s.html}</section>`).join('')}
     ${tab === 'шпаргалка' ? doc.types.map((t) => `<section class="th-sec"><h3>Тип ${t.id.slice(1)}. ${esc(t.title)}</h3>${t.html}</section>`).join('') : ''}

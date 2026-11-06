@@ -216,3 +216,18 @@ html { scrollbar-color: var(--line) transparent; }
 details.crit { margin-top: var(--s3); border-top: 1px solid var(--line); padding-top: var(--s2); }
 details.crit > summary { cursor: pointer; color: var(--blue); font-size: 14px; }
 details.crit table { margin-top: var(--s2); }
+
+/* Таблица в условии задачи (распределение, «как изменится», соответствие) */
+.task .q .tbl { margin: 12px 0; }
+.task .q table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.task .q th, .task .q td { border: 1px solid var(--line); padding: 8px 14px; text-align: center; min-width: 52px; }
+.task .q th:first-child, .task .q td:first-child { text-align: left; }
+.task .q thead th { background: var(--surface2); font-weight: 600; }
+.task .q > p:first-child { margin-top: 0; }
+/* Формулы номера: кнопка в задаче и блок в теории */
+.formulas ul { padding-left: 0; list-style: none; margin: 0; }
+.formulas li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.formulas li:last-child { border-bottom: 0; }
+.formulas h3 { margin: 18px 0 6px; font-size: 1em; }
+.formulas-box { border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; margin: 0 0 var(--s4); max-width: var(--measure); }
+.formulas-box summary { cursor: pointer; font-weight: 600; }
