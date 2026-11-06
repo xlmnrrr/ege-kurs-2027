@@ -274,3 +274,5 @@ figure.fig { margin: var(--s4) 0; max-width: 560px; background: var(--surface2);
   .doc .mathd .katex-display { font-size: .92em; }
 }
 @media print { .board, .solve-nav, .dw, .dw-scrim { display: none !important; } }
+@media (max-width: 760px) { .solve-nav { bottom: calc(48px + env(safe-area-inset-bottom)); padding-bottom: 10px; } .solve-nav .btn { padding: 0 12px; } }
+@media (max-width: 760px) { .solve-nav { gap: 6px; } .solve-nav .row { flex-wrap: nowrap; gap: 6px; } .solve-nav .btn { min-height: 40px; font-size: 14px; padding: 0 10px; white-space: nowrap; } }
