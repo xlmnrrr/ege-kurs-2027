@@ -180,7 +180,7 @@ function todayTitle(d) {
 function blockHTML(b) {
   const n = b.num && App.catalog.find((x) => x.id === b.num);
   const what = b.kind === 'review' ? `Повторение ошибок${b.count ? ` — ${plural(b.count, 'задача', 'задачи', 'задач')}` : ' — пока нечего повторять, реши пару задач прошлых номеров'}`
-    : b.kind === 'number' && n ? `<a href="${numLink(n)}">${n.subject === 'математика' ? 'Математика' : 'Физика'}, №${n.num}. ${esc(n.title)}</a> — ${b.stage === 'с нуля' ? 'теория → типы → тренажёр' : 'продолжаем: типы и тренажёр'}${n.hasContent ? '' : ' <span class="muted">(разбор готовится)</span>'}`
+    : b.kind === 'number' && n ? `<a href="${numLink(n)}">${n.subject === 'математика' ? 'Математика' : 'Физика'}, №${n.num}. ${esc(n.title)}</a> — ${b.stage === 'с нуля' ? '«Проверить себя» → задачи по типам, теория — кнопкой в задаче' : 'продолжаем задачи по типам'}${n.hasContent ? '' : ' <span class="muted">(разбор готовится)</span>'}`
       : b.kind === 'mock' ? `Пробник на 235 минут: ${b.subject}` : `Смешанные задачи: ${b.subject}`;
   return `<div class="block"><span class="min">${b.minutes} мин</span><span>${what}</span></div>`;
 }
