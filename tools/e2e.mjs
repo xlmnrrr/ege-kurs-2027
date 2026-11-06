@@ -53,30 +53,55 @@ try {
   await shot(p, 'iphone-home');
   // запоминание устройства
   await p.open(BASE); ok(await p.until(`!!document.querySelector('#orbits')`, 10000), 'после перезагрузки вход не нужен (устройство запомнено)');
-  // номер: разбор, шаги рисунка
-  await p.run(`location.hash='#/м/1'`); ok(await p.until(`!!document.querySelector('.example .stage svg .ch-line')`, 10000), 'номер 1: пример с рисунком');
+  // номер: экран «Задачи» — карточки типов и «Проверить себя»
+  await p.run(`location.hash='#/м/1'`); ok(await p.until(`document.querySelectorAll('.type-card').length >= 5`, 10000), 'номер 1: карточки типов задач');
+  ok(await p.run(`!!document.querySelector('.check-card a[href$="/проверка"]')`), 'номер 1: «Проверить себя»');
+  // теория: пример с пошаговым рисунком
+  await p.run(`location.hash='#/м/1/теория'`); ok(await p.until(`!!document.querySelector('.th-sec figure.fig svg .ch-line')`, 10000), 'вкладка «Теория»: разделы с рисунками');
+  await p.run(`location.hash='#/м/1/шпаргалка'`); ok(await p.until(`!!document.querySelector('.example .stage svg .ch-line')`, 10000), 'номер 1: пример с рисунком');
   ok(await p.run(`document.querySelector('.example').querySelectorAll('.stepcard').length === 4`), 'пример: 4 шага');
+  await p.run(`document.querySelector('.example .chips button').click()`); await sleep(200);
   await p.run(`document.querySelector('.example [data-next]').click()`); await sleep(300);
   ok(await p.run(`document.querySelector('.example .stepcard.cur h4').textContent.includes('Шаг 2')`), 'кнопка «›» — шаг 2, карточка подсвечена');
-  ok(await p.run(`document.querySelectorAll('.example svg [data-step="1"].on').length > 0 && document.querySelectorAll('.example svg [data-step="2"].on').length === 0`), 'рисунок показывает только шаги ≤ текущего');
+  ok(await p.run(`document.querySelector('.example').querySelectorAll('svg [data-step="1"].on').length > 0 && document.querySelector('.example').querySelectorAll('svg [data-step="2"].on').length === 0`), 'рисунок показывает только шаги ≤ текущего');
   ok(await p.run(`document.querySelectorAll('.doc .katex').length > 3`), 'формулы отрисованы (KaTeX из сборки)');
   ok(await p.run(`!!document.querySelector('figure.fig svg .ch-line')`), 'рисунок теории отрисован');
   ok(await noHScroll(p), 'страница номера 393 px: без горизонтальной прокрутки');
   await shot(p, 'iphone-number');
-  // уже знаю
-  const knIds = await p.run(`[...document.querySelectorAll('.known input')].map(i=>i.dataset.id)`);
-  await p.run(`(()=>{const A=${JSON.stringify(ANS)}; document.querySelectorAll('.known input').forEach(i=>{i.value=A[i.dataset.id];}); document.querySelector('.known form').requestSubmit();})()`); await sleep(400);
-  ok((await p.run(`document.querySelector('.kn-res').textContent`)).includes(`${knIds.length} из ${knIds.length}`), `«Уже знаю?»: верные ответы приняты (${knIds.length} из ${knIds.length})`);
   // лист формул
   await p.run(`document.querySelector('.add-formula').click()`); await sleep(300);
+  // «Проверить себя»: все верные ответы с первой попытки
+  await p.run(`location.hash='#/м/1/проверка'`); await p.until(`!!document.querySelector('.task')`, 8000);
+  let kn = 0;
+  for (let k = 0; k < 8; k++) {
+    const id = (await p.run(`document.querySelector('.task').getAttribute('aria-label')`)).replace('Задача ', '');
+    await p.run(`(()=>{const i=document.querySelector('.task input'); i.value=${JSON.stringify('')} + ${JSON.stringify(ANS)}[${JSON.stringify(id)}]; document.querySelector('.task form').requestSubmit();})()`); await sleep(250);
+    kn++;
+    const last = await p.run(`document.querySelector('[data-next]').textContent.includes('Итог')`);
+    await p.run(`document.querySelector('[data-next]').click()`); await sleep(300);
+    if (last) break;
+  }
+  ok((await p.run(`document.querySelector('.page h2')?.textContent || ''`)).startsWith(`${kn} из ${kn}`), `«Проверить себя»: ${kn} из ${kn} с первой попытки`);
+  // экран задачи: черновик и панель теории
+  await p.run(`location.hash='#/м/1/тип/t1'`); await p.until(`!!document.querySelector('.task')`, 8000);
+  ok(await p.run(`document.querySelectorAll('.board .bd-stage canvas').length === 3 && !!document.querySelector('.board [data-act=fig]')`), 'у задачи есть черновик (кисть, рисунок, клетки)');
+  await p.run(`document.querySelector('[data-theory]').click()`); await sleep(500);
+  ok(await p.run(`document.querySelector('.dw').classList.contains('on') && !!document.querySelector('.dw-body .example')`), '«Теория» открывает панель с разобранным примером');
+  await p.run(`document.querySelector('.dw [data-close]').click()`); await sleep(300);
+  // диагностика: у каждой задачи черновик по кнопке (физика тоже)
+  for (const L of ['м', 'ф']) {
+    await p.run(`location.hash='#/диагностика/${L}'`); await p.until(`(document.querySelector('h1')?.textContent || '').includes('${L === 'м' ? 'математика' : 'физика'}') && document.querySelectorAll('.dt').length > 5`, 10000);
+    await p.run(`[...document.querySelectorAll('.dt .btn')].find(b=>b.textContent==='Черновик').click()`); await sleep(400);
+    ok(await p.run(`document.querySelectorAll('.dt .board:not([hidden]) .bd-stage canvas').length === 3`), `диагностика (${L === 'м' ? 'математика' : 'физика'}): черновик открывается у задачи`);
+  }
+  await p.run(`location.hash='#/м/1/тип/t1'`); await p.until(`!!document.querySelector('.task')`, 8000);
   // тренажёр: 3 ошибки -> подсказка 1, подсказка 2, решение
-  await p.run(`location.hash='#/м/1/тренажёр'`); await p.until(`!!document.querySelector('.task')`, 8000);
   const wrong = async () => { await p.run(`(()=>{const i=document.querySelector('.task input'); i.value='99999'; document.querySelector('.task form').requestSubmit();})()`); await sleep(250); };
   await wrong(); ok(await p.run(`document.querySelectorAll('.task .hint').length === 1`), 'ошибка 1 → подсказка 1');
   await wrong(); ok(await p.run(`document.querySelectorAll('.task .hint').length === 2`), 'ошибка 2 → подсказка 2');
   await wrong(); ok(await p.run(`!!document.querySelector('.task .key') && document.querySelector('.task input').disabled`), 'ошибка 3 → полное решение, ввод закрыт');
   await shot(p, 'iphone-trainer');
-  await p.run(`[...document.querySelectorAll('.task .btn.primary')].find(b=>b.textContent.includes('Следующая')).click()`); await sleep(400);
+  await p.run(`document.querySelector('[data-next]').click()`); await sleep(400);
   const tid = (await p.run(`document.querySelector('.task').getAttribute('aria-label')`)).replace('Задача ', '');
   await p.run(`(()=>{const i=document.querySelector('.task input'); i.value=${JSON.stringify(' ' + (ANS[tid] || '') + ' ')}; document.querySelector('.task form').requestSubmit();})()`); await sleep(300);
   ok((await p.run(`document.querySelector('.task .result').textContent`)).startsWith('Верно'), 'верный ответ (с пробелами) принят');
@@ -110,10 +135,10 @@ try {
   await p.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
   await p.open(BASE); const offlineOk = await p.until(`!!document.querySelector('#orbits')`, 10000);
   ok(offlineOk, 'офлайн: курс открывается без сети (Service Worker)');
-  await p.run(`location.hash='#/м/1'`); ok(await p.until(`!!document.querySelector('.example')`, 8000), 'офлайн: номер открывается из кэша');
+  await p.run(`location.hash='#/м/1'`); ok(await p.until(`!!document.querySelector('.type-card')`, 8000), 'офлайн: номер открывается из кэша');
   await p.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
   // выход
-  await p.run(`location.hash='#/настройки'`); await p.until(`!!document.querySelector('[data-logout]')`, 5000);
+  await sleep(1500); await p.open(BASE + encodeURI('#/настройки')); await p.until(`!!document.querySelector('[data-logout]')`, 8000);
   await p.run(`document.querySelector('[data-logout]').click()`); ok(await p.until(`!!document.querySelector('input[type=password]')`, 8000), 'выход на устройстве — снова экран пароля');
 
   // ---------- устройство B: ПК, синхронизация ----------
@@ -125,7 +150,7 @@ try {
   ok(tasksB >= 2, `синхронизация: ПК получил ответы с iPhone (${tasksB})`);
   ok(await noHScroll(q), 'главная 1440 px: без горизонтальной прокрутки');
   await shot(q, 'pc-home');
-  await q.run(`location.hash='#/м/1'`); await q.until(`!!document.querySelector('.example .stage svg')`, 8000); await sleep(800);
+  await q.run(`location.hash='#/м/1/шпаргалка'`); await q.until(`!!document.querySelector('.example')`, 8000); await sleep(800);
   ok(await q.run(`getComputedStyle(document.querySelector('.example')).gridTemplateColumns.split(' ').length === 2`), 'ПК: разворот «рисунок + шаги» в две колонки');
   await shot(q, 'pc-number');
   for (const w of [320, 768]) { await q.size(w, 800, { dpr: 1, mobile: w < 768 }); await sleep(300); ok(await noHScroll(q), `номер ${w} px: без горизонтальной прокрутки`); }

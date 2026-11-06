@@ -1,11 +1,11 @@
 // Офлайн: оболочка и все зашифрованные пакеты в кэше. VERSION подставляет tools/build.mjs — новая сборка = новый кэш.
-const VERSION = '186ba01a58ee-ba1cf2da';
+const VERSION = '324c5dea9eea-1abc7458';
 const CACHE = `ege-${VERSION}`;
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest',
   'assets/css/tokens.css', 'assets/css/base.css', 'assets/css/chertezh.css', 'assets/vendor/katex/katex.min.css',
   'assets/js/app.js', 'assets/js/crypto.js', 'assets/js/store.js', 'assets/js/progress.js', 'assets/js/plan.js', 'assets/js/number.js',
-  'assets/js/chertezh.js', 'assets/js/extras.js', 'assets/js/calc.js', 'assets/js/sync.js', 'assets/js/diag.js',
+  'assets/js/chertezh.js', 'assets/js/extras.js', 'assets/js/calc.js', 'assets/js/sync.js', 'assets/js/diag.js', 'assets/js/board.js',
   'assets/fonts/literata.woff2', 'assets/fonts/literata-italic.woff2', 'assets/fonts/commissioner.woff2',
   'assets/img/icon.svg', 'assets/img/icon-180.png', 'assets/img/icon-192.png', 'assets/img/icon-512.png',
   'data/keys.json', 'data/version.json', 'data/config.json',

@@ -117,7 +117,7 @@ async function route() {
     else if (SUBJ[parts[0]] && !parts[1]) view = subjectView(SUBJ[parts[0]]);
     else if (SUBJ[parts[0]] && parts[1]) {
       const n = App.catalog.find((x) => x.subject === SUBJ[parts[0]] && x.num === +parts[1]);
-      view = n ? await renderNumber(App, n, parts[2] || 'разбор') : notFound();
+      view = n ? await renderNumber(App, n, parts[2] || 'задачи', parts[3]) : notFound();
     } else if (parts[0] === 'план') view = planView();
     else if (parts[0] === 'заметки') view = notesView();
     else if (parts[0] === 'настройки') view = settingsView();
@@ -126,7 +126,7 @@ async function route() {
     else view = notFound();
   } catch (e) { console.error(e); view = h(`<div class="page"><h1>Не открылось</h1><p class="lead">${esc(e.message)}. Обнови страницу; если повторится — проверь, что сайт обновился.</p></div>`); }
   main.innerHTML = ''; main.appendChild(view);
-  if (!location.hash.includes('/тренажёр')) scrollTo(0, 0);
+  scrollTo(0, 0);
   document.title = (view.dataset.title ? view.dataset.title + ' — ' : '') + 'ЕГЭ курс 2027';
   main.focus({ preventScroll: true });
 }

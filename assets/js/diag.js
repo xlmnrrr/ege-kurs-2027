@@ -3,6 +3,7 @@
 import { App, esc, h, record, toast, numLink, loadBundle } from './app.js';
 import { checkAnswer } from './number.js';
 import { Chertezh, mid, lerp, V } from './chertezh.js';
+import { mountBoard } from './board.js';
 import { sound } from './extras.js';
 
 const LEVEL = ['с нуля', 'слабо', 'почти', 'знаю'];
@@ -31,6 +32,11 @@ export async function renderDiag(App_, letter) {
     tasks.forEach((t, k) => {
       const box = h(`<div class="dt" data-id="${esc(t.id)}" style="margin-top:var(--s3)"><div>${t.q}</div>${t.fig && figs[t.fig] ? '<figure class="fig"><svg role="img" aria-label="Рисунок к задаче"></svg></figure>' : ''}</div>`);
       if (t.fig && figs[t.fig]) { const ch = new Chertezh(box.querySelector('svg'), { mode: '2d' }); figs[t.fig](ch, { mid, lerp, V }); ch.render(); ch.setStep(0, true); }
+      { // черновик у каждой задачи диагностики — открывается по кнопке (на странице десятки задач)
+        const bt = h('<button type="button" class="btn small quiet" style="margin-top:var(--s2)">Черновик</button>'), host = h('<div class="board" hidden style="position:static;margin-top:var(--s2)"><div class="bd-host"></div></div>');
+        bt.onclick = () => { if (host.hidden) { host.hidden = false; if (!host.dataset.on) { mountBoard(host.querySelector('.bd-host'), { key: 'диаг:' + t.id, getFigure: () => box.querySelector('figure.fig svg') }); host.dataset.on = 1; } bt.textContent = 'Скрыть черновик'; } else { host.hidden = true; bt.textContent = 'Черновик'; } };
+        box.append(bt, host);
+      }
       if (t.part === 1) box.appendChild(h(`<label class="field" style="margin-top:var(--s2)">Ответ<input class="input" inputmode="decimal" data-ans></label>`));
       else {
         const more = h(`<div style="margin-top:var(--s2)"><button type="button" class="btn small">Решил на листе — показать решение и критерии</button><div class="crit" hidden><div class="key">${t.sol}</div><div class="criteria">${t.criteria || ''}</div>
