@@ -14,7 +14,7 @@ const PORT = 8120, BASE = `http://127.0.0.1:${PORT}/`;
 // ответы задач №1 — тест не зависит от состава банка (задачи генерируются)
 const ANS = Object.fromEntries(JSON.parse(readFileSync(join(SITE, '..', 'контент', 'математика', '01', 'задачи.json'), 'utf8')).map((t) => [t.id, t.ответ]));
 const syncDir = mkdtempSync(join(tmpdir(), 'ege-sync-'));
-const server = spawn(process.execPath, [join(SITE, 'tools', 'dev-server.mjs'), SITE, String(PORT)], { env: { ...process.env, EGE_SYNC_DIR: syncDir }, stdio: 'ignore' });
+const server = spawn(process.execPath, [join(SITE, 'tools', 'dev-server.mjs'), SITE, String(PORT)], { env: { ...process.env, EGE_DEV_KEYS: '1', EGE_SYNC_DIR: syncDir }, stdio: 'ignore' });
 await sleep(700);
 
 let pass = 0, fail = 0;
@@ -31,7 +31,7 @@ async function newTab(b, { w = 393, h = 852, dpr = 3, mobile = true } = {}) {
 }
 const login = async (p, password = PW, remember = true) => {
   await p.until(`!!document.querySelector('input[type=password]')`, 8000);
-  await p.run(`(()=>{const f=document.querySelector('.lock form'); f.password.value=${JSON.stringify(password)}; f.remember.checked=${remember}; f.requestSubmit();})()`);
+  await p.run(`(()=>{const f=document.querySelector('.lock form'); f.username.value='test'; f.password.value=${JSON.stringify(password)}; f.remember.checked=${remember}; f.requestSubmit();})()`);
 };
 const noHScroll = (p) => p.run(`document.documentElement.scrollWidth <= innerWidth + 1`);
 const shot = async (p, name) => { if (shotsDir) await p.shot(join(shotsDir, name + '.png')); };
@@ -43,12 +43,16 @@ try {
   await p.open(BASE); await sleep(500);
   await login(p, 'неверный-пароль');
   await p.until(`document.querySelector('.lock .err')?.textContent.length > 5`, 8000);
-  ok((await p.run(`document.querySelector('.lock .err').textContent`)).includes('Пароль не подошёл'), 'неверный пароль: понятное сообщение');
+  ok((await p.run(`document.querySelector('.lock .err').textContent`)).includes('не подошли'), 'неверный пароль: понятное сообщение');
   ok(!(await p.run(`!!document.querySelector('#pmap')`)), 'неверный пароль: курс не открылся');
   await login(p);
   ok(await p.until(`!!document.querySelector('#pmap')`, 10000), 'верный пароль: главная с картой номеров');
   ok((await p.run(`document.querySelectorAll('#pmap .nchip').length`)) === 46, 'в карте номеров 46 номеров (20 + 26)');
-  ok(await p.run(`document.querySelectorAll('.timeline .tl').length === 3`), 'план на сегодня: 3 блока (повторение, номер, смешанные)');
+  // будни — 3 блока, суббота — пробник (1 блок), воскресенье — отдых (0)
+  const wd = await p.run(`new Date().getDay()`);
+  const tl = await p.run(`document.querySelectorAll('.timeline .tl').length`);
+  const expTl = wd === 6 ? 1 : wd === 0 ? 0 : 3;
+  ok(tl === expTl, `план на сегодня: ${tl} блок(ов), ожидалось ${expTl} (день недели ${wd})`);
   ok(await noHScroll(p), 'главная 393 px: без горизонтальной прокрутки');
   await shot(p, 'iphone-home');
   // запоминание устройства
