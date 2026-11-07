@@ -32,6 +32,9 @@ function ask(prompt) { // скрытый ввод без пакетов
   });
 }
 
+const argName = () => { const i = process.argv.indexOf('--name'); return i > 0 ? process.argv[i + 1] : null; };
+const account = (name, password) => `${String(name).trim().toLowerCase()}\n${password}`;   // как в assets/js/app.js
+
 async function main() {
   let password;
   if (process.argv.includes('--dev')) {
@@ -41,15 +44,22 @@ async function main() {
       writeFileSync(f, `${words[randomInt(10)]}-${words[randomInt(10)]}-${randomInt(100, 999)}\n`);
     }
     password = readFileSync(f, 'utf8').trim();
-    console.log('Тестовый пароль: в', f, '(заменить настоящим перед публикацией: node tools/set-password.mjs)');
+    // тестовый аккаунт «test» — только для локальных автотестов: справки\keys-dev.json, на сайт не попадает
+    writeFileSync(join(SPRAVKI, 'keys-dev.json'), JSON.stringify(await wrapK(dataKey(), account('test', password)), null, 1));
+    console.log('Тестовый аккаунт test (пароль в', f + ') → справки\keys-dev.json; data/keys.json не тронут.');
+    return;
+  } else if (process.env.EGE_PASSWORD) {
+    password = process.env.EGE_PASSWORD;   // для запуска без терминала; в файлы не пишется
   } else {
     const a = await ask('Новый пароль курса (не короче 10 символов): ');
     const b = await ask('Ещё раз: ');
     if (a !== b) { console.log('Пароли не совпали — ничего не изменено.'); process.exit(1); }
-    if (a.length < 10) { console.log('Слишком короткий: нужно 10+ символов (лучше 3–4 слова через дефис).'); process.exit(1); }
+    if (a.length < 8) { console.log('Слишком короткий: нужно 8+ символов.'); process.exit(1); }
     password = a;
   }
-  const keys = await wrapK(dataKey(), password);
+  const name = argName();
+  if (!name) { console.log('Укажи имя аккаунта: node tools/set-password.mjs --name ИМЯ'); process.exit(1); }
+  const keys = { ...(await wrapK(dataKey(), account(name, password))), login: 'name+password' };
   mkdirSync(join(SITE, 'data'), { recursive: true });
   writeFileSync(join(SITE, 'data', 'keys.json'), JSON.stringify(keys, null, 1));
   console.log('Готово: data/keys.json обновлён. Контент перешифровывать не нужно (ключ данных тот же).');

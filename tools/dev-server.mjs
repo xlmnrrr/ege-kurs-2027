@@ -68,6 +68,8 @@ function handleSync(req, res) {
 function handler(req, res) {
   const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (p === '/sync' && req.method === 'POST') return handleSync(req, res);
+  // автотесты (EGE_DEV_KEYS=1): вход тестовым аккаунтом из справки\keys-dev.json вместо настоящего
+  if (p === '/data/keys.json' && process.env.EGE_DEV_KEYS) { res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end(readFileSync(join(SPRAVKI, 'keys-dev.json'))); return; }
   // локально синхронизируемся со своим сервером, даже если в data/config.json адрес облачной функции (EGE_CLOUD_SYNC=1 — проверить облако)
   if (p === '/data/config.json' && !process.env.EGE_CLOUD_SYNC) { res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }).end('{ "syncUrl": "/sync" }'); return; }
   let file = normalize(join(ROOT, p));

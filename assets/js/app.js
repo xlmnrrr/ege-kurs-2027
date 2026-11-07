@@ -51,19 +51,22 @@ const planOpts = () => ({ studyDays: setting('studyDays', DEFAULTS.studyDays), m
 
 // ---------- вход ----------
 let fails = 0, blockedUntil = 0;
+// Аккаунт = имя + пароль: из них выводится ключ, которым обёрнут ключ данных (имя без учёта регистра и пробелов по краям)
+const account = (name, password) => `${String(name).trim().toLowerCase()}\n${password}`;
+
 function lockView() {
   $('#top').hidden = true;
   const main = $('#main');
   main.innerHTML = '';
   const v = h(`<div class="lock"><div class="lock-box">
     ${solidHTML('lock-solid')}
-    <h1>ЕГЭ курс 2027</h1><p class="lead">Математика профиль и физика. Курс зашифрован — введи пароль.</p>
+    <h1>ЕГЭ курс 2027</h1><p class="lead">Математика профиль и физика. Войди в свой аккаунт — прогресс подтянется на любом устройстве.</p>
     <form autocomplete="on">
-      <input type="text" name="username" autocomplete="username" value="ege-kurs-2027" hidden aria-hidden="true">
-      <label class="field">Пароль<input class="input" type="password" name="password" autocomplete="current-password" required minlength="4" autofocus></label>
+      <label class="field">Имя<input class="input" type="text" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus></label>
+      <label class="field">Пароль<input class="input" type="password" name="password" autocomplete="current-password" required minlength="4"></label>
       <label class="check"><input type="checkbox" name="remember" checked> Запомнить это устройство</label>
       <p class="err" role="alert"></p>
-      <button class="btn primary" type="submit">Открыть курс</button>
+      <button class="btn primary" type="submit">Войти</button>
     </form></div></div>`);
   main.appendChild(v);
   mountSolid($('.solid', v)); fxEnter(v); setView(false);
@@ -73,13 +76,13 @@ function lockView() {
     if (Date.now() < blockedUntil) { err.textContent = `Слишком много попыток. Подожди ${Math.ceil((blockedUntil - Date.now()) / 1000)} с.`; return; }
     btn.disabled = true; btn.textContent = 'Открываю…'; err.textContent = '';
     try {
-      const k = await unlock(form.password.value, App.keys);
+      const k = await unlock(account(form.username.value, form.password.value), App.keys);
       if (form.remember.checked) await store.put('keys', k, 'K');
       App.K = k; fails = 0; await enter();
     } catch (x) {
       fails++; if (fails >= 5) { blockedUntil = Date.now() + 30000; fails = 0; }
-      err.textContent = x.message === 'PASSWORD' ? 'Пароль не подошёл. Проверь раскладку и Caps Lock.' : `Не получилось открыть курс: ${x.message}`;
-      btn.disabled = false; btn.textContent = 'Открыть курс'; form.password.select();
+      err.textContent = x.message === 'PASSWORD' ? 'Имя или пароль не подошли. Проверь раскладку и Caps Lock.' : `Не получилось открыть курс: ${x.message}`;
+      btn.disabled = false; btn.textContent = 'Войти'; form.password.select();
     }
   };
 }
@@ -297,7 +300,7 @@ function settingsView() {
       <div class="row"><label class="field" style="min-width:200px">Что сбросить<select class="input" data-rscope><option value="математика">Только математику</option><option value="физика">Только физику</option><option value="всё">Весь прогресс</option></select></label>
       <label class="field" style="min-width:200px"><span data-rq></span><input class="input" inputmode="numeric" data-rans autocomplete="off"></label></div>
       <div class="row" style="margin-top:var(--s2)"><button class="btn danger" data-reset disabled>Сбросить</button><span class="muted ui" data-rmsg></span></div></div>
-    <div class="card"><h3>Пароль и устройство</h3><p class="ui">Пароль меняется на компьютере командой <code>node tools/set-password.mjs</code> (контент перешифровывать не нужно). Это устройство ${App.K ? 'запомнено' : 'не запомнено'}.</p>
+    <div class="card"><h3>Аккаунт и устройство</h3><p class="ui">Вход — имя и пароль; прогресс общий для всех устройств, где выполнен вход. Имя и пароль меняются на компьютере командой <code>node tools/set-password.mjs --name ИМЯ</code> (контент перешифровывать не нужно). Это устройство ${App.K ? 'запомнено' : 'не запомнено'}.</p>
       <button class="btn" data-logout>Выйти на этом устройстве</button></div>
     <p class="muted ui" style="font-size:13px">Версия контента: ${esc(App.version?.v || '—')}</p></div>`);
   $('[data-sync]', v).onclick = async () => { await syncNow(true); route(); };
