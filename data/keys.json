@@ -2,7 +2,8 @@
  "v": 1,
  "kdf": "PBKDF2-SHA256",
  "iter": 600000,
- "salt": "4nmJBST06pnxp+ZG/nt5xQ==",
- "wrapped": "AeVilr3zFEfgxRTe4V6wUZeBZbk3oC1w1Ms3tJetKiQ1G4zqHwq45AnnMXJSWGNZaF9wNDKtVEWa7RGJpQ==",
- "check": "ATSBg+d/GVZZXO4AhuT4yEHL3WnUJaGBptQBGXzmEMNBEGXtzhaktTuv"
+ "salt": "EZ0stf92Mj7akqb2kDardw==",
+ "wrapped": "Abrxr5o1StBeyZBgAZ977fRgds3GwVPHwlbM03TBdXeGzh/cN2fwE52ucWrlJirZ9D+tYrbvkTDnP3Qrjg==",
+ "check": "ASTTndrwDPV97tIjtm570EURQ81ADpooNNfUOoNGc2xLCprgsWxFyl+g",
+ "login": "name+password"
 }
