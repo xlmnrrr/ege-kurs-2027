@@ -231,3 +231,28 @@ details.crit table { margin-top: var(--s2); }
 .formulas h3 { margin: 18px 0 6px; font-size: 1em; }
 .formulas-box { border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; margin: 0 0 var(--s4); max-width: var(--measure); }
 .formulas-box summary { cursor: pointer; font-weight: 600; }
+
+
+/* Русский: секции теории сворачиваются, чтобы не было простыни текста */
+.th-sec.th-fold{padding:0;border:0}
+.th-sec.th-fold>summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:12px;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.10)}
+.th-sec.th-fold>summary::-webkit-details-marker{display:none}
+.th-sec.th-fold>summary h3{margin:0;display:inline}
+.th-sec.th-fold>summary::after{content:'\25BE';margin-left:auto;opacity:.45;font-size:14px;transition:transform .2s}
+.th-sec.th-fold[open]>summary::after{transform:rotate(180deg)}
+.th-sec.th-fold>.th-body{padding:6px 0 20px}
+.th-sec.th-fold>.th-body>p:first-child{margin-top:0}
+.toc:empty{display:none}
+
+
+/* Русский: своя структура чтения — оглавление, счётчик, кнопки, аккуратные стрелки */
+.toc-h{display:block;margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.55;font-weight:600}
+.fold-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.th-sec.th-fold>summary::after{content:'\25BE';margin-left:auto;opacity:.5;font-size:13px;line-height:1;transition:transform .18s ease}
+.th-sec.th-fold>summary:hover::after{opacity:.9}
+.th-sec.th-fold[open]>summary::after{transform:rotate(180deg)}
+.th-sec.th-fold[open]>summary{border-bottom-color:rgba(233,176,98,0.45)}
+.th-sec.th-fold[open]>summary h3{color:inherit}
+.th-body{padding:6px 0 22px}
+.doc.theory .toc a{display:block;padding:4px 0}
+

@@ -228,8 +228,10 @@ function solveScreen(host, list, ctx) {
 export async function renderNumber(App_, n, tab, arg) {
   const base = numLink(n);
   if (tab === 'разбор') tab = 'задачи';            // старые ссылки
-  const head = `<div class="num-head"><p class="ui muted" style="margin:0 0 6px"><a href="#/${subjLet(n)}">${subjName(n)}</a> · задание ${n.num} · ${n.part === 1 ? 'часть 1' : 'часть 2'}</p>
-    <h1>№${n.num}. ${esc(n.title)}</h1><p class="lead">${n.points ? `${n.points} ${n.points === 1 ? 'балл' : n.points < 5 ? 'балла' : 'баллов'} · ` : ''}на экзамене ~${n.minutes} мин${n.pct2026 ? ` · в 2026 решили ${Math.round(n.pct2026)} %` : ''}</p></div>`;
+  const ru = n.subject === 'русский';               // у русского нет задач, ловушек и формул — только чтение
+  if (ru && (tab === 'задачи' || !tab)) tab = 'теория';
+  const head = `<div class="num-head"><p class="ui muted" style="margin:0 0 6px"><a href="#/${subjLet(n)}">${subjName(n)}</a> · ${ru ? 'раздел ' + n.num : 'задание ' + n.num + ' · ' + (n.part === 1 ? 'часть 1' : 'часть 2')}</p>
+    <h1>№${n.num}. ${esc(n.title)}</h1><p class="lead">${n.points ? `${n.points} ${n.points === 1 ? 'балл' : n.points < 5 ? 'балла' : 'баллов'} · ` : ''}${ru ? esc(n.about || '') + ' · ~' + n.minutes + ' мин' : 'на экзамене ~' + n.minutes + ' мин'}${n.pct2026 ? ` · в 2026 решили ${Math.round(n.pct2026)} %` : ''}</p></div>`;
   if (!n.hasContent) return h(`<div class="page" data-title="№${n.num} ${esc(n.title)}">${head}<div class="card"><h3>Разбор готовится</h3><p>Этот номер ещё собирается из всех книг КАГ и банка ФИПИ. План занятий учитывает его — когда разбор появится, он откроется здесь.</p><p><a class="btn" href="#/${subjLet(n)}">К списку номеров</a></p></div></div>`);
   const b = await loadBundle(n.id), figs = await figuresOf(b), doc = parseDoc(b.html);
   const v = h(`<div class="page" data-title="№${n.num} ${esc(n.title)}"></div>`);
@@ -243,9 +245,9 @@ export async function renderNumber(App_, n, tab, arg) {
     return v;
   }
   const all = b.tasks.length, done = solved(b.tasks), p = all ? Math.round((done / all) * 100) : 0;
-  const tabs = `<nav class="tabs" aria-label="Разделы номера">${[['задачи', 'Задачи'], ['теория', 'Теория'], ['ловушки', 'Ловушки'], ['шпаргалка', 'Шпаргалка А4']].map(([k, t]) => `<a href="${base}${k === 'задачи' ? '' : '/' + k}" ${tab === k ? 'aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
-  v.innerHTML = `<div class="num-hero">${head}<div class="ring" style="--p:${p}" aria-label="Освоено ${p} %"><span>${p}%<small>освоено</small></span></div></div>
-    <div class="row no-print"><button class="btn small" data-note>Заметка</button><button class="btn small" data-mark aria-pressed="${!!App.S.marks[n.id]}">${App.S.marks[n.id] ? 'В закладках' : 'В закладки'}</button><span class="muted ui">решено ${done} из ${all}</span></div>
+  const tabs = ru ? '' : `<nav class="tabs" aria-label="Разделы номера">${[['задачи', 'Задачи'], ['теория', 'Теория'], ['ловушки', 'Ловушки'], ['шпаргалка', 'Шпаргалка А4']].map(([k, t]) => `<a href="${base}${k === 'задачи' ? '' : '/' + k}" ${tab === k ? 'aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
+  v.innerHTML = `<div class="num-hero">${head}${ru ? '' : `<div class="ring" style="--p:${p}" aria-label="Освоено ${p} %"><span>${p}%<small>освоено</small></span></div>`}</div>
+    <div class="row no-print"><button class="btn small" data-note>Заметка</button><button class="btn small" data-mark aria-pressed="${!!App.S.marks[n.id]}">${App.S.marks[n.id] ? 'В закладках' : 'В закладки'}</button>${ru ? '<span class="muted ui">открывай разделы по одному — так читается легче</span>' : `<span class="muted ui">решено ${done} из ${all}</span>`}</div>
     <div class="note-box"></div>${tabs}<div class="body"></div>`;
   const body = v.querySelector('.body');
   v.querySelector('[data-mark]').onclick = async (e) => { const on = !App.S.marks[n.id]; await record('mark', { key: n.id, on, title: `${subjName(n)} №${n.num}. ${n.title}` }); e.target.textContent = on ? 'В закладках' : 'В закладки'; e.target.setAttribute('aria-pressed', on); };
@@ -267,13 +269,22 @@ export async function renderNumber(App_, n, tab, arg) {
   }
   if (tab === 'ловушки') { body.innerHTML = `<div class="doc">${doc.traps.join('') || '<p class="empty">Ловушек нет.</p>'}</div>`; return v; }
   // теория (и шпаргалка — вся теория + типы с примерами в последнем шаге)
+  const fold = n.subject === 'русский'; // русский читают блоками: секции теории сворачиваются
   const art = h(`<article class="doc theory">${doc.intro.join('')}
     ${doc.formulas ? `<details class="formulas-box" ${tab === 'шпаргалка' ? 'open' : ''}><summary class="ui">Формулы номера</summary><div class="formulas">${doc.formulas}</div></details>` : ''}
-    <nav class="toc no-print">${doc.theory.map((s, k) => `<a href="#" data-go="${k}">${esc(s.title)}</a>`).join('')}</nav>
-    ${doc.theory.map((s, k) => `<section class="th-sec" id="th-${k}"><h3>${esc(s.title)}</h3>${s.html}</section>`).join('')}
+    <nav class="toc no-print">${fold ? '<b class="toc-h">Содержание</b>' : ''}${doc.theory.map((s, k) => `<a href="#" data-go="${k}">${esc(s.title)}</a>`).join('')}</nav>
+    ${doc.theory.map((s, k) => fold
+      ? `<details class="th-sec th-fold" id="th-${k}" ${k === 0 ? 'open' : ''}><summary><h3>${esc(s.title)}</h3></summary><div class="th-body">${s.html}</div></details>`
+      : `<section class="th-sec" id="th-${k}"><h3>${esc(s.title)}</h3>${s.html}</section>`).join('')}
     ${tab === 'шпаргалка' ? doc.types.map((t) => `<section class="th-sec"><h3>Тип ${t.id.slice(1)}. ${esc(t.title)}</h3>${t.html}</section>`).join('') : ''}
     ${doc.tail.join('')}</article>`);
   body.appendChild(art);
+  if (fold) { // русский читают блоками: оглавление, счётчик разделов и кнопки развернуть/свернуть
+    const bar = h(`<div class="row no-print fold-bar"><span class="muted ui">Разделов: ${doc.theory.length}</span><button class="btn small" data-unfold>Развернуть все</button><button class="btn small" data-fold>Свернуть все</button></div>`);
+    body.prepend(bar);
+    bar.querySelector('[data-unfold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = true));
+    bar.querySelector('[data-fold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = false));
+  }
   art.querySelectorAll('[data-go]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); art.querySelector('#th-' + a.dataset.go)?.scrollIntoView({ behavior: 'smooth' }); }));
   drawFigs(art, figs);
   for (const ex of b.examples) { const hostEx = art.querySelector(`[data-example="${CSS.escape(ex.id)}"]`); if (hostEx) stand(hostEx, ex, figs, n.id); }
