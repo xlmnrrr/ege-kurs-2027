@@ -67,7 +67,7 @@ function lockView() {
     <h1>ЕГЭ курс 2027</h1><p class="lead">Математика профиль и физика. Войди в свой аккаунт — прогресс подтянется на любом устройстве.</p>
     <form autocomplete="on">
       <label class="field">Имя<input class="input" type="text" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus></label>
-      <label class="field">Пароль<input class="input" type="password" name="password" autocomplete="current-password" required minlength="4"></label>
+      <label class="field">Пароль<input class="input" type="password" name="password" autocomplete="current-password" required></label>
       <label class="check"><input type="checkbox" name="remember" checked> Запомнить это устройство</label>
       <p class="err" role="alert"></p>
       <button class="btn primary" type="submit">Войти</button>
