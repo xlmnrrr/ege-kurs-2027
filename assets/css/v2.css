@@ -311,3 +311,14 @@ details.crit table { margin-top: var(--s2); }
 .ru-index[open]>summary::after{transform:rotate(-135deg);opacity:.8}
 .ru-group[open]>summary::after{transform:rotate(-135deg);opacity:.8}
 
+
+/* Русский: заголовки групп внутри раздела (Уровень S / A / B) */
+.doc.theory h2.th-group{margin:26px 0 10px;padding:8px 0 8px 12px;border-left:3px solid #E9B062;font-size:17px;letter-spacing:.01em;opacity:.95}
+.doc.theory h2.th-group:first-of-type{margin-top:6px}
+.doc.theory .th-sec.th-fold>summary h3{font-size:16px;font-weight:600}
+@media (max-width:520px){
+  .doc.theory h2.th-group{margin:20px 0 8px;font-size:16px;padding-left:10px}
+  .doc.theory .th-sec.th-fold>summary{padding:13px 0}
+  .doc.theory .th-sec.th-fold>summary h3{font-size:15px}
+}
+

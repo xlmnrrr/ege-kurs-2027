@@ -1,5 +1,5 @@
 // Офлайн: оболочка и все зашифрованные пакеты в кэше. VERSION подставляет tools/build.mjs — новая сборка = новый кэш.
-const VERSION = 'de174fef7134-ae16c3cb';
+const VERSION = '5b28f83fdac7-4e7cddf4';
 const CACHE = `ege-${VERSION}`;
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest',

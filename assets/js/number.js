@@ -270,17 +270,24 @@ export async function renderNumber(App_, n, tab, arg) {
   if (tab === 'ловушки') { body.innerHTML = `<div class="doc">${doc.traps.join('') || '<p class="empty">Ловушек нет.</p>'}</div>`; return v; }
   // теория (и шпаргалка — вся теория + типы с примерами в последнем шаге)
   const fold = n.subject === 'русский'; // русский читают блоками: секции теории сворачиваются
+  // пустая секция = заголовок группы (например «Уровень S» перед произведениями)
+  const secs = (doc.theory || []).map((s, k) => ({ s, k, group: fold && !String(s.html || '').trim() }));
+  const real = secs.filter((x) => !x.group);
+  const tocHTML = real.map((x) => `<a href="#" data-go="${x.k}">${esc(x.s.title)}</a>`).join('');
+  const secsHTML = secs.map((x) => x.group
+    ? `<h2 class="th-group" id="th-${x.k}">${esc(x.s.title)}</h2>`
+    : (fold
+      ? `<details class="th-sec th-fold" id="th-${x.k}"><summary><h3>${esc(x.s.title)}</h3></summary><div class="th-body">${x.s.html}</div></details>`
+      : `<section class="th-sec" id="th-${x.k}"><h3>${esc(x.s.title)}</h3>${x.s.html}</section>`)).join('');
   const art = h(`<article class="doc theory">${doc.intro.join('')}
     ${doc.formulas ? `<details class="formulas-box" ${tab === 'шпаргалка' ? 'open' : ''}><summary class="ui">Формулы номера</summary><div class="formulas">${doc.formulas}</div></details>` : ''}
-    <nav class="toc no-print">${fold ? '<b class="toc-h">Содержание</b>' : ''}${doc.theory.map((s, k) => `<a href="#" data-go="${k}">${esc(s.title)}</a>`).join('')}</nav>
-    ${doc.theory.map((s, k) => fold
-      ? `<details class="th-sec th-fold" id="th-${k}"><summary><h3>${esc(s.title)}</h3></summary><div class="th-body">${s.html}</div></details>`
-      : `<section class="th-sec" id="th-${k}"><h3>${esc(s.title)}</h3>${s.html}</section>`).join('')}
+    <nav class="toc no-print">${fold ? '<b class="toc-h">Содержание</b>' : ''}${fold ? tocHTML : doc.theory.map((s, k) => `<a href="#" data-go="${k}">${esc(s.title)}</a>`).join('')}</nav>
+    ${fold ? secsHTML : doc.theory.map((s, k) => `<section class="th-sec" id="th-${k}"><h3>${esc(s.title)}</h3>${s.html}</section>`).join('')}
     ${tab === 'шпаргалка' ? doc.types.map((t) => `<section class="th-sec"><h3>Тип ${t.id.slice(1)}. ${esc(t.title)}</h3>${t.html}</section>`).join('') : ''}
     ${doc.tail.join('')}</article>`);
   body.appendChild(art);
   if (fold) { // русский читают блоками: оглавление, счётчик разделов и кнопки развернуть/свернуть
-    const bar = h(`<div class="row no-print fold-bar"><span class="muted ui">Разделов: ${doc.theory.length}</span><button class="btn small" data-unfold>Развернуть все</button><button class="btn small" data-fold>Свернуть все</button></div>`);
+    const bar = h(`<div class="row no-print fold-bar"><span class="muted ui">Разделов: ${fold ? real.length : doc.theory.length}</span><button class="btn small" data-unfold>Развернуть все</button><button class="btn small" data-fold>Свернуть все</button></div>`);
     body.prepend(bar);
     bar.querySelector('[data-unfold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = true));
     bar.querySelector('[data-fold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = false));
