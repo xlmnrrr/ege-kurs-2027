@@ -14,7 +14,7 @@ import { dataKey } from './set-password.mjs';
 const SITE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONTENT = join(SITE, '..', 'контент');
 const OUT = join(SITE, 'data', 'enc');
-const SUBJ = { математика: 'm', физика: 'f' };
+const SUBJ = { математика: 'm', физика: 'f', русский: 'r' };
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const warn = [];
 

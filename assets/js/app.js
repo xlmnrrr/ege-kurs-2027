@@ -13,13 +13,16 @@ export const App = { K: null, keys: null, catalog: [], bundles: {}, tasksById: {
 const $ = (s, r = document) => r.querySelector(s);
 export const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 export const h = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
-export const SUBJ = { м: 'математика', ф: 'физика' }, LETTER = { математика: 'м', физика: 'ф' };
+export const SUBJ = { м: 'математика', ф: 'физика', р: 'русский' }, LETTER = { математика: 'м', физика: 'ф', русский: 'р' };
+export const SUBJ_LIST = ['математика', 'физика', 'русский'];
+export const SUBJ_LABEL = { математика: 'Математика · профиль', физика: 'Физика', русский: 'Русский · итоговое сочинение' };
 export const numLink = (n) => `#/${LETTER[n.subject]}/${n.num}`;
 const ICON = {
   today: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   math: '<path d="M5 7h14M9 7v11M15 7v8a3 3 0 0 0 3 3"/>',
   phys: '<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8" transform="rotate(120 12 12)"/>',
   book: '<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/>',
+  ru: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h5M9 7h3"/>',
   plan: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>',
   note: '<path d="M6 3h12v18l-6-4-6 4z"/>',
   diag: '<path d="M4 19h16M7 16V9M12 16V5M17 16v-4"/>',
@@ -30,7 +33,7 @@ const ICON = {
   calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11v6M8 15h2M12 15h2"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
 };
-const NAV = [['#/', 'today', 'Сегодня'], ['#/м', 'math', 'Математика'], ['#/ф', 'phys', 'Физика'], ['#/формулы', 'book', 'Формулы'], ['#/план', 'plan', 'План'], ['#/заметки', 'note', 'Заметки']];
+const NAV = [['#/', 'today', 'Сегодня'], ['#/м', 'math', 'Математика'], ['#/ф', 'phys', 'Физика'], ['#/р', 'ru', 'Русский'], ['#/формулы', 'book', 'Формулы'], ['#/план', 'plan', 'План'], ['#/заметки', 'note', 'Заметки']];
 const NAV_EXTRA = [['#/диагностика', 'diag', 'Диагностика'], ['#/повтор', 'redo', 'Повторение ошибок'], ['#/настройки', 'gear', 'Настройки']];
 export const icon = (n) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[n] || ''}</svg>`;
 export function toast(text, ms = 2600) { const t = h(`<div class="toast" role="status">${esc(text)}</div>`); document.body.appendChild(t); setTimeout(() => t.remove(), ms); }
@@ -171,7 +174,7 @@ function progressMap() {
   let open = false; try { open = localStorage.getItem('pmap') === '1'; } catch { /* приватный режим */ }
   return `<details class="pmap" id="pmap"${open ? ' open' : ''}>
     <summary><span class="pm-t">Карта номеров</span><span class="pm-c"><i class="done"></i>освоено ${cnt('done')}<i class="work"></i>в работе ${cnt('work')}<i class="new"></i>не начато ${cnt('new')}</span></summary>
-    <div class="pm-body">${['математика', 'физика'].map((sub) => `<div class="pm-sub"><h3>${sub === 'математика' ? 'Математика · профиль' : 'Физика'}</h3>
+    <div class="pm-body">${SUBJ_LIST.map((sub) => `<div class="pm-sub"><h3>${SUBJ_LABEL[sub]}</h3>
       <div class="pm-grid">${ST.map(([k, t]) => `<div class="pm-col"><div class="pm-h">${t} · ${(by[sub + k] || []).length}</div><div class="pm-list">${(by[sub + k] || []).map(chip).join('') || '<span class="muted ui">—</span>'}</div></div>`).join('')}</div></div>`).join('')}</div></details>`;
 }
 async function home() {
@@ -185,7 +188,7 @@ async function home() {
   const v = h(`<div class="page" data-title="Сегодня"><div class="home2">
     <header class="hero"><div class="hero-t"><p class="eyebrow">${esc(date)}</p><h1 id="today-h">${today.kind === 'rest' ? 'Сегодня отдых' : today.kind === 'mock' ? 'Сегодня пробник' : 'План на сегодня'}</h1>
       <p class="lead">${mins ? `${mins} минут занятий. ` : ''}Сначала задачи — теория открывается прямо в задаче.</p>
-      <div class="hero-stats"><span><b data-count="${mastered('математика')}">${mastered('математика')}</b> из 20 по математике</span><span><b data-count="${mastered('физика')}">${mastered('физика')}</b> из 26 по физике</span><span><b data-count="${S.xp}">${S.xp}</b> опыта</span></div></div>
+      <div class="hero-stats"><span><b data-count="${mastered('математика')}">${mastered('математика')}</b> из 20 по математике</span><span><b data-count="${mastered('физика')}">${mastered('физика')}</b> из 26 по физике</span><span><b data-count="${mastered('русский')}">${mastered('русский')}</b> из ${App.catalog.filter((n) => n.subject === 'русский').length} по русскому</span><span><b data-count="${S.xp}">${S.xp}</b> опыта</span></div></div>
       ${solidHTML()}</header>
     <div class="home-grid">
       <div class="col-main">
@@ -237,16 +240,23 @@ export function statusOf(n) {
 function subjectView(subject) {
   const nums = App.catalog.filter((n) => n.subject === subject);
   const card = (n) => { const st = statusOf(n); return `<a class="num ${st === 'done' ? 'done' : st === 'work' ? 'work' : ''} ${n.hasContent ? '' : 'soon'}" href="${numLink(n)}">
-    <span class="n">${n.num}</span><span><span class="t">${esc(n.title)}${n.isNew ? ' · новое' : ''}</span><br><span class="s">${plural(n.points, 'балл', 'балла', 'баллов')} · ~${n.minutes} мин${n.pct2026 ? ` · решают ${Math.round(n.pct2026)}&nbsp;%` : ''}</span></span>
+    <span class="n">${n.num}</span><span><span class="t">${esc(n.title)}${n.isNew ? ' · новое' : ''}</span><br><span class="s">${n.points ? plural(n.points, 'балл', 'балла', 'баллов') + ' · ' : ''}~${n.minutes} мин${n.pct2026 ? ` · решают ${Math.round(n.pct2026)}&nbsp;%` : ''}</span></span>
     <span class="st">${n.hasContent ? { done: 'освоен', work: 'в работе', new: 'не начат' }[st] : 'скоро'}</span></a>`; };
   const cnt = { done: 0, work: 0, new: 0 }; nums.forEach((n) => cnt[statusOf(n)]++);
   const pct = Math.round((cnt.done / nums.length) * 100), ready = nums.filter((n) => n.hasContent).length;
-  return h(`<div class="page" data-title="${subject}"><div class="sub-hero"><div><p class="eyebrow">${subject === 'математика' ? 'ЕГЭ-2027 · профиль' : 'ЕГЭ-2027'}</p><h1>${subject === 'математика' ? 'Математика' : 'Физика'}</h1>
-    <p class="lead">${subject === 'математика' ? '20 заданий, 33 первичных балла, 235 минут.' : '26 заданий, 45 первичных баллов, 235 минут.'} Разборов готово: ${ready} из ${nums.length}.</p>
+  const hero = subject === 'русский'
+    ? { eyebrow: 'ЕГЭ-2027 · итоговое сочинение', name: 'Русский', lead: `${nums.length} разделов: структура, клише, карта тем и аргументы по произведениям.` }
+    : subject === 'математика'
+      ? { eyebrow: 'ЕГЭ-2027 · профиль', name: 'Математика', lead: '20 заданий, 33 первичных балла, 235 минут.' }
+      : { eyebrow: 'ЕГЭ-2027', name: 'Физика', lead: '26 заданий, 45 первичных баллов, 235 минут.' };
+  return h(`<div class="page" data-title="${subject}"><div class="sub-hero"><div><p class="eyebrow">${hero.eyebrow}</p><h1>${hero.name}</h1>
+    <p class="lead">${hero.lead} Разборов готово: ${ready} из ${nums.length}.</p>
     <div class="legend ui"><span><i class="done"></i>освоено ${cnt.done}</span><span><i class="work"></i>в работе ${cnt.work}</span><span><i class="new"></i>не начато ${cnt.new}</span></div></div>
     <div class="ring big" style="--p:${pct}"><span>${pct}%<small>освоено</small></span></div></div>
-    <h2 class="part-h">Часть 1</h2><div class="nums">${nums.filter((n) => n.part === 1).map(card).join('')}</div>
-    <h2 class="part-h">Часть 2 — развёрнутый ответ</h2><div class="nums">${nums.filter((n) => n.part === 2).map(card).join('')}</div></div>`);
+    ${subject === 'русский'
+      ? `<div class="nums">${nums.map(card).join('')}</div>`
+      : `<h2 class="part-h">Часть 1</h2><div class="nums">${nums.filter((n) => n.part === 1).map(card).join('')}</div>
+    <h2 class="part-h">Часть 2 — развёрнутый ответ</h2><div class="nums">${nums.filter((n) => n.part === 2).map(card).join('')}</div>`}</div>`);
 }
 
 // ---------- план ----------

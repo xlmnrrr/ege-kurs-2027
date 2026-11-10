@@ -1,5 +1,5 @@
 {
- "v": "adce071a2c69",
+ "v": "7d493ecfc024",
  "files": [
   "catalog.bin",
   "df.bin",
@@ -50,6 +50,18 @@
   "m18.bin",
   "m19.bin",
   "m20.bin",
+  "r01.bin",
+  "r02.bin",
+  "r03.bin",
+  "r04.bin",
+  "r05.bin",
+  "r06.bin",
+  "r07.bin",
+  "r08.bin",
+  "r09.bin",
+  "r10.bin",
+  "r11.bin",
+  "r12.bin",
   "sp-a.bin",
   "sp-f.bin",
   "sp-g.bin"

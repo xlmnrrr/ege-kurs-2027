@@ -8,6 +8,12 @@ import { dueReviews } from './progress.js';
 import { sound, speak } from './extras.js';
 import { mountBoard } from './board.js';
 
+// Подписи и буквы предметов в одном месте: раньше здесь было жёстко «математика или физика»
+const SUBJ_NAME = { математика: 'Математика', физика: 'Физика', русский: 'Русский' };
+const SUBJ_LET = { математика: 'м', физика: 'ф', русский: 'р' };
+const subjName = (n) => SUBJ_NAME[n.subject] || n.subject;
+const subjLet = (n) => SUBJ_LET[n.subject] || 'м';
+
 const figMods = {};
 async function figuresOf(b) { // код рисунков номера: расшифрованный текст -> модуль через Blob URL
   if (!b.figures) return {};
@@ -130,7 +136,7 @@ function taskCard(task, numId, figs, opt = {}) {
   const srcTxt = task.src ? `${esc(task.src.вид || '')}${task.src.где ? ': ' + esc(task.src.где) : ''}` : '';
   const LV = ['', 'база', 'средний', 'трудный'];
   const el = h(`<article class="task" aria-label="Задача ${esc(task.id)}">
-    <div class="task-meta"><span class="chip">${n ? `${n.subject === 'математика' ? 'Математика' : 'Физика'} №${n.num}` : ''} · тип ${esc(task.type.replace(/^t/, ''))}</span><span class="chip lv${task.level}">${LV[task.level] || ''}</span>
+    <div class="task-meta"><span class="chip">${n ? `${subjName(n)} №${n.num}` : ''} · тип ${esc(task.type.replace(/^t/, ''))}</span><span class="chip lv${task.level}">${LV[task.level] || ''}</span>
       <button class="btn quiet small" data-say>Вслух</button></div>
     <div class="q">${task.q}</div>
     ${task.fig && figs[task.fig] ? '<figure class="fig"><svg role="img" aria-label="Рисунок к задаче"></svg></figure>' : ''}
@@ -222,9 +228,9 @@ function solveScreen(host, list, ctx) {
 export async function renderNumber(App_, n, tab, arg) {
   const base = numLink(n);
   if (tab === 'разбор') tab = 'задачи';            // старые ссылки
-  const head = `<div class="num-head"><p class="ui muted" style="margin:0 0 6px"><a href="#/${n.subject === 'математика' ? 'м' : 'ф'}">${n.subject === 'математика' ? 'Математика' : 'Физика'}</a> · задание ${n.num} · ${n.part === 1 ? 'часть 1' : 'часть 2'}</p>
-    <h1>№${n.num}. ${esc(n.title)}</h1><p class="lead">${n.points} ${n.points === 1 ? 'балл' : n.points < 5 ? 'балла' : 'баллов'} · на экзамене ~${n.minutes} мин${n.pct2026 ? ` · в 2026 решили ${Math.round(n.pct2026)} %` : ''}</p></div>`;
-  if (!n.hasContent) return h(`<div class="page" data-title="№${n.num} ${esc(n.title)}">${head}<div class="card"><h3>Разбор готовится</h3><p>Этот номер ещё собирается из всех книг КАГ и банка ФИПИ. План занятий учитывает его — когда разбор появится, он откроется здесь.</p><p><a class="btn" href="#/${n.subject === 'математика' ? 'м' : 'ф'}">К списку номеров</a></p></div></div>`);
+  const head = `<div class="num-head"><p class="ui muted" style="margin:0 0 6px"><a href="#/${subjLet(n)}">${subjName(n)}</a> · задание ${n.num} · ${n.part === 1 ? 'часть 1' : 'часть 2'}</p>
+    <h1>№${n.num}. ${esc(n.title)}</h1><p class="lead">${n.points ? `${n.points} ${n.points === 1 ? 'балл' : n.points < 5 ? 'балла' : 'баллов'} · ` : ''}на экзамене ~${n.minutes} мин${n.pct2026 ? ` · в 2026 решили ${Math.round(n.pct2026)} %` : ''}</p></div>`;
+  if (!n.hasContent) return h(`<div class="page" data-title="№${n.num} ${esc(n.title)}">${head}<div class="card"><h3>Разбор готовится</h3><p>Этот номер ещё собирается из всех книг КАГ и банка ФИПИ. План занятий учитывает его — когда разбор появится, он откроется здесь.</p><p><a class="btn" href="#/${subjLet(n)}">К списку номеров</a></p></div></div>`);
   const b = await loadBundle(n.id), figs = await figuresOf(b), doc = parseDoc(b.html);
   const v = h(`<div class="page" data-title="№${n.num} ${esc(n.title)}"></div>`);
   const solved = (list) => list.filter((t) => App.S.tasks[t.id]?.last?.ok).length;
@@ -242,12 +248,12 @@ export async function renderNumber(App_, n, tab, arg) {
     <div class="row no-print"><button class="btn small" data-note>Заметка</button><button class="btn small" data-mark aria-pressed="${!!App.S.marks[n.id]}">${App.S.marks[n.id] ? 'В закладках' : 'В закладки'}</button><span class="muted ui">решено ${done} из ${all}</span></div>
     <div class="note-box"></div>${tabs}<div class="body"></div>`;
   const body = v.querySelector('.body');
-  v.querySelector('[data-mark]').onclick = async (e) => { const on = !App.S.marks[n.id]; await record('mark', { key: n.id, on, title: `${n.subject === 'математика' ? 'Математика' : 'Физика'} №${n.num}. ${n.title}` }); e.target.textContent = on ? 'В закладках' : 'В закладки'; e.target.setAttribute('aria-pressed', on); };
+  v.querySelector('[data-mark]').onclick = async (e) => { const on = !App.S.marks[n.id]; await record('mark', { key: n.id, on, title: `${subjName(n)} №${n.num}. ${n.title}` }); e.target.textContent = on ? 'В закладках' : 'В закладки'; e.target.setAttribute('aria-pressed', on); };
   v.querySelector('[data-note]').onclick = () => {
     const nb = v.querySelector('.note-box'); if (nb.firstChild) { nb.innerHTML = ''; return; }
     const cur = App.S.notes[n.id]?.text || '';
     const f = h(`<form class="card" style="margin-top:var(--s3)"><label class="field">Заметка к номеру<textarea class="input" name="t">${esc(cur)}</textarea></label><div class="row" style="margin-top:var(--s2)"><button class="btn primary" type="submit">Сохранить</button></div></form>`);
-    f.onsubmit = async (e) => { e.preventDefault(); await record('note', { key: n.id, text: f.t.value.trim(), title: `${n.subject === 'математика' ? 'Математика' : 'Физика'} №${n.num}. ${n.title}` }); toast('Заметка сохранена'); nb.innerHTML = ''; };
+    f.onsubmit = async (e) => { e.preventDefault(); await record('note', { key: n.id, text: f.t.value.trim(), title: `${subjName(n)} №${n.num}. ${n.title}` }); toast('Заметка сохранена'); nb.innerHTML = ''; };
     nb.appendChild(f); f.t.focus();
   };
 
@@ -274,7 +280,7 @@ export async function renderNumber(App_, n, tab, arg) {
   art.querySelectorAll('.mathd').forEach((m, k) => {
     const key = `${n.id}:f${k}`, on = !!App.S.formulas[key];
     const btn = h(`<button class="iconbtn add-formula no-print" aria-pressed="${on}" aria-label="${on ? 'Убрать из листа формул' : 'Добавить в мой лист формул'}" title="Мой лист формул"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${on ? 'M5 12l4 4 10-10' : 'M12 5v14M5 12h14'}"/></svg></button>`);
-    btn.onclick = async () => { const now = !App.S.formulas[key]; await record('formula', { key, on: now, tex: m.querySelector('.katex')?.outerHTML || m.innerHTML, title: `${n.subject === 'математика' ? 'Математика' : 'Физика'} №${n.num}` }); btn.setAttribute('aria-pressed', now); btn.querySelector('path').setAttribute('d', now ? 'M5 12l4 4 10-10' : 'M12 5v14M5 12h14'); toast(now ? 'Формула в листе формул' : 'Убрано из листа формул'); };
+    btn.onclick = async () => { const now = !App.S.formulas[key]; await record('formula', { key, on: now, tex: m.querySelector('.katex')?.outerHTML || m.innerHTML, title: `${subjName(n)} №${n.num}` }); btn.setAttribute('aria-pressed', now); btn.querySelector('path').setAttribute('d', now ? 'M5 12l4 4 10-10' : 'M12 5v14M5 12h14'); toast(now ? 'Формула в листе формул' : 'Убрано из листа формул'); };
     m.appendChild(btn);
   });
   if (tab === 'шпаргалка') {
