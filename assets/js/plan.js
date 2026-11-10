@@ -4,7 +4,7 @@ import { dueReviews, mastery, startOfDay } from './progress.js';
 
 const DAY = 86400000;
 export const DEFAULTS = {
-  exams: { математика: '2027-06-07', физика: '2027-06-10' }, // проект расписания (исследование\расписание-2027.md)
+  exams: { русский: '2026-12-02', математика: '2027-06-07', физика: '2027-06-10' }, // русский — итоговое сочинение (сообщение школы), остальное — проект расписания 2027
   minutes: 120,
   studyDays: [1, 2, 3, 4, 5, 6],      // пн–сб (0 = вс)
   mockDay: 6,                          // суббота — пробник
@@ -36,9 +36,10 @@ const parse = (s) => { const [y, m, d] = s.split('-').map(Number); return new Da
  */
 export function buildPlan(s, catalog, { now = Date.now(), days = 14, tasksById = {}, opts = {} } = {}) {
   const o = { ...DEFAULTS, ...opts, exams: { ...DEFAULTS.exams, ...(opts.exams || {}) } };
-  const q = { математика: queue(s, catalog, 'математика', tasksById), физика: queue(s, catalog, 'физика', tasksById) };
-  const left = (subj) => q[subj].reduce((a, x) => a + x.left, 0);
-  const pointer = { математика: 0, физика: 0 }, used = { математика: 0, физика: 0 };
+  const subjects = Object.keys(o.exams);
+  const q = {}; subjects.forEach((sub) => (q[sub] = queue(s, catalog, sub, tasksById)));
+  const left = (subj) => (q[subj] || []).reduce((a, x) => a + x.left, 0);
+  const pointer = {}, used = {}; subjects.forEach((sub) => { pointer[sub] = 0; used[sub] = 0; });
   const reviews = dueReviews(s, now).length;
   const out = [];
   let t = startOfDay(now), lastSubj = s.settings.lastSubject || 'физика';
@@ -55,9 +56,19 @@ export function buildPlan(s, catalog, { now = Date.now(), days = 14, tasksById =
       continue;
     }
     // какой предмет сегодня: тот, у кого «давление» (остаток / дни до срока) больше; при равенстве — чередуем
+    // какой предмет сегодня: у кого «давление» (остаток на день до срока) больше, при близких — чередуем
     const pressure = (subj) => (left(subj) - used[subj]) / Math.max(1, daysTo(subj) - o.finishBefore);
-    let subj = pressure('математика') > pressure('физика') * 1.15 ? 'математика' : pressure('физика') > pressure('математика') * 1.15 ? 'физика' : (lastSubj === 'математика' ? 'физика' : 'математика');
-    if (left(subj) - used[subj] <= 0) subj = subj === 'математика' ? 'физика' : 'математика';
+    const ranked = subjects.slice().sort((a, b) => pressure(b) - pressure(a));
+    let subj;
+    if (ranked.length > 1 && pressure(ranked[0]) > pressure(ranked[1]) * 1.15) subj = ranked[0];
+    else {
+      const alt = subjects.filter((x) => x !== lastSubj && left(x) - used[x] > 0).sort((a, b) => pressure(b) - pressure(a));
+      subj = alt[0] || ranked[0];
+    }
+    if (left(subj) - used[subj] <= 0) {
+      const rest = subjects.filter((x) => left(x) - used[x] > 0).sort((a, b) => pressure(b) - pressure(a));
+      if (rest.length) subj = rest[0];
+    }
     lastSubj = subj;
     const blocks = [];
     const rev = i === 0 ? reviews : 0;
@@ -78,7 +89,7 @@ export function buildPlan(s, catalog, { now = Date.now(), days = 14, tasksById =
 export function feasibility(s, catalog, { now = Date.now(), tasksById = {}, opts = {} } = {}) {
   const o = { ...DEFAULTS, ...opts };
   const res = {};
-  for (const subj of ['математика', 'физика']) {
+  for (const subj of new Set([...Object.keys(DEFAULTS.exams), ...Object.keys(o.exams)])) {
     const need = queue(s, catalog, subj, tasksById).reduce((a, x) => a + x.left, 0);
     let have = 0;
     for (let t = startOfDay(now); t < parse(o.exams[subj]) - o.finishBefore * DAY; t += DAY) { const wd = new Date(t).getDay(); if (o.studyDays.includes(wd) && wd !== o.mockDay) have++; }

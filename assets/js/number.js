@@ -140,7 +140,8 @@ function taskCard(task, numId, figs, opt = {}) {
       <button class="btn quiet small" data-say>Вслух</button></div>
     <div class="q">${task.q}</div>
     ${task.fig && figs[task.fig] ? '<figure class="fig"><svg role="img" aria-label="Рисунок к задаче"></svg></figure>' : ''}
-    <form class="answer" autocomplete="off"><label class="sr" for="a-${esc(task.id)}">Ответ</label><input class="input" id="a-${esc(task.id)}" inputmode="decimal" placeholder="Ответ"><button class="btn primary" type="submit">Проверить</button></form>
+    ${Array.isArray(task.choices) && task.choices.length ? `<div class="choices">${task.choices.map((c, i) => `<button type="button" class="choice" data-v="${i + 1}"><b>${i + 1}</b><span>${c}</span></button>`).join('')}</div>` : ''}
+    <form class="answer${Array.isArray(task.choices) && task.choices.length ? ' answer-hidden' : ''}" autocomplete="off"><label class="sr" for="a-${esc(task.id)}">Ответ</label><input class="input" id="a-${esc(task.id)}" inputmode="decimal" placeholder="Ответ"><button class="btn primary" type="submit">Проверить</button></form>
     <div class="tools"><button class="btn" data-hint>Подсказка</button>${opt.onTheory ? '<button class="btn" data-theory>Теория</button>' : ''}${opt.onFormulas ? '<button class="btn" data-formulas>Формулы</button>' : ''}<button class="btn quiet" data-sol>Решение</button></div>
     <div class="res" aria-live="polite"></div><div class="hints"></div>
     ${srcTxt ? `<p class="src">Источник: ${srcTxt}</p>` : ''}</article>`);
@@ -163,10 +164,19 @@ function taskCard(task, numId, figs, opt = {}) {
     await record('answer', { task: task.id, num: numId, ok, hints, tries, given: input.value });
     opt.onFinish?.(ok);
   }
+  el.querySelectorAll('.choice').forEach((btn) => (btn.onclick = () => {
+    if (done) return;
+    el.querySelectorAll('.choice').forEach((x) => x.classList.remove('picked'));
+    btn.classList.add('picked');
+    input.value = btn.getAttribute('data-v');
+    el.querySelector('form').requestSubmit();
+  }));
   el.querySelector('form').onsubmit = (e) => {
     e.preventDefault(); if (done) return;
     const r = checkAnswer(input.value, task);
     if (r === null) { res.innerHTML = '<div class="result bad"><b>Введи ответ.</b> Число как в бланке: запятая, минус, без единиц.</div>'; return; }
+    el.querySelectorAll('.choice').forEach((x) => x.classList.toggle('right', !!r && x.classList.contains('picked')));
+    el.querySelectorAll('.choice.picked').forEach((x) => { if (!r) x.classList.add('wrong'); });
     if (r) { res.innerHTML = `<div class="result ok"><b>Верно.</b> ${tries || hints ? 'С подсказкой — задача вернётся на повторение завтра.' : 'Чисто, без подсказок.'}</div>`; sound.play('ok'); finish(true); return; }
     tries++; sound.play('bad');
     res.innerHTML = `<div class="result bad"><b>Пока неверно.</b> ${tries === 1 ? 'Вот подсказка — попробуй ещё раз.' : tries === 2 ? 'Вторая подсказка — уже почти решение.' : 'Смотри полное решение — задача вернётся на повторение.'}</div>`;
@@ -227,9 +237,9 @@ function solveScreen(host, list, ctx) {
 
 export async function renderNumber(App_, n, tab, arg) {
   const base = numLink(n);
+  const ru = n.subject === 'русский';
   if (tab === 'разбор') tab = 'задачи';            // старые ссылки
-  const ru = n.subject === 'русский';               // у русского нет задач, ловушек и формул — только чтение
-  if (ru && (tab === 'задачи' || !tab)) tab = 'теория';
+  if (!tab) tab = ru ? 'теория' : 'задачи';        // у русского по умолчанию чтение, у остальных задачи
   const head = `<div class="num-head"><p class="ui muted" style="margin:0 0 6px"><a href="#/${subjLet(n)}">${subjName(n)}</a> · ${ru ? 'раздел ' + n.num : 'задание ' + n.num + ' · ' + (n.part === 1 ? 'часть 1' : 'часть 2')}</p>
     <h1>№${n.num}. ${esc(n.title)}</h1><p class="lead">${n.points ? `${n.points} ${n.points === 1 ? 'балл' : n.points < 5 ? 'балла' : 'баллов'} · ` : ''}${ru ? esc(n.about || '') + ' · ~' + n.minutes + ' мин' : 'на экзамене ~' + n.minutes + ' мин'}${n.pct2026 ? ` · в 2026 решили ${Math.round(n.pct2026)} %` : ''}</p></div>`;
   if (!n.hasContent) return h(`<div class="page" data-title="№${n.num} ${esc(n.title)}">${head}<div class="card"><h3>Разбор готовится</h3><p>Этот номер ещё собирается из всех книг КАГ и банка ФИПИ. План занятий учитывает его — когда разбор появится, он откроется здесь.</p><p><a class="btn" href="#/${subjLet(n)}">К списку номеров</a></p></div></div>`);
@@ -246,8 +256,8 @@ export async function renderNumber(App_, n, tab, arg) {
   }
   const all = b.tasks.length, done = solved(b.tasks), p = all ? Math.round((done / all) * 100) : 0;
   const tabs = ru ? '' : `<nav class="tabs" aria-label="Разделы номера">${[['задачи', 'Задачи'], ['теория', 'Теория'], ['ловушки', 'Ловушки'], ['шпаргалка', 'Шпаргалка А4']].map(([k, t]) => `<a href="${base}${k === 'задачи' ? '' : '/' + k}" ${tab === k ? 'aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
-  v.innerHTML = `<div class="num-hero">${head}${ru ? '' : `<div class="ring" style="--p:${p}" aria-label="Освоено ${p} %"><span>${p}%<small>освоено</small></span></div>`}</div>
-    <div class="row no-print"><button class="btn small" data-note>Заметка</button><button class="btn small" data-mark aria-pressed="${!!App.S.marks[n.id]}">${App.S.marks[n.id] ? 'В закладках' : 'В закладки'}</button>${ru ? '<span class="muted ui">открывай разделы по одному — так читается легче</span>' : `<span class="muted ui">решено ${done} из ${all}</span>`}</div>
+  v.innerHTML = `<div class="num-hero">${head}${(!ru || all) ? `<div class="ring" style="--p:${p}" aria-label="Освоено ${p} %"><span>${p}%<small>освоено</small></span></div>` : ''}</div>
+    <div class="row no-print"><button class="btn small" data-note>Заметка</button><button class="btn small" data-mark aria-pressed="${!!App.S.marks[n.id]}">${App.S.marks[n.id] ? 'В закладках' : 'В закладки'}</button>${ru ? `<span class="muted ui">${all ? `решено ${done} из ${all} · ` : ''}открывай разделы по одному — так читается легче</span>` : `<span class="muted ui">решено ${done} из ${all}</span>`}</div>
     <div class="note-box"></div>${tabs}<div class="body"></div>`;
   const body = v.querySelector('.body');
   v.querySelector('[data-mark]').onclick = async (e) => { const on = !App.S.marks[n.id]; await record('mark', { key: n.id, on, title: `${subjName(n)} №${n.num}. ${n.title}` }); e.target.textContent = on ? 'В закладках' : 'В закладки'; e.target.setAttribute('aria-pressed', on); };
@@ -290,6 +300,7 @@ export async function renderNumber(App_, n, tab, arg) {
   body.appendChild(art);
   if (fold) { // русский читают блоками: оглавление, счётчик разделов и кнопки развернуть/свернуть
     const bar = h(`<div class="row no-print fold-bar"><span class="muted ui">Разделов: ${fold ? real.length : doc.theory.length}</span><button class="btn small" data-unfold>Развернуть все</button><button class="btn small" data-fold>Свернуть все</button></div>`);
+    if (all) bar.appendChild(h(`<a class="btn primary" href="${base}/задачи">Задания: ${done} из ${all}</a>`));
     body.prepend(bar);
     bar.querySelector('[data-unfold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = true));
     bar.querySelector('[data-fold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = false));

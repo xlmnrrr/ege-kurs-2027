@@ -16,6 +16,7 @@ export const h = (html) => { const t = document.createElement('template'); t.inn
 export const SUBJ = { м: 'математика', ф: 'физика', р: 'русский' }, LETTER = { математика: 'м', физика: 'ф', русский: 'р' };
 export const SUBJ_LIST = ['математика', 'физика', 'русский'];
 export const SUBJ_LABEL = { математика: 'Математика · профиль', физика: 'Физика', русский: 'Русский · итоговое сочинение' };
+export const SUBJ_SHORT = { математика: 'Математика', физика: 'Физика', русский: 'Русский' };
 export const numLink = (n) => `#/${LETTER[n.subject]}/${n.num}`;
 const ICON = {
   today: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -140,7 +141,7 @@ async function route() {
     else if (SUBJ[parts[0]] && !parts[1]) view = subjectView(SUBJ[parts[0]]);
     else if (SUBJ[parts[0]] && parts[1]) {
       const n = App.catalog.find((x) => x.subject === SUBJ[parts[0]] && x.num === +parts[1]);
-      view = n ? await renderNumber(App, n, parts[2] || 'задачи', parts[3]) : notFound();
+      view = n ? await renderNumber(App, n, parts[2], parts[3]) : notFound(); // вкладку по умолчанию выбирает сам номер: у математики и физики «задачи», у русского «чтение»
     } else if (parts[0] === 'план') view = planView();
     else if (parts[0] === 'заметки') view = notesView();
     else if (parts[0] === 'формулы') view = await (await import('./spravka.js')).renderRef(App, parts[1]);
@@ -182,7 +183,7 @@ async function home() {
   const today = buildPlan(S, App.catalog, { days: 1, tasksById: App.tasksById, opts: planOpts() })[0];
   const fc = forecast(S, App.catalog, App.tasksById), st = streak(S, Date.now(), planOpts().studyDays), lv = level(S.xp);
   const due = dueReviews(S).length;
-  const dm = daysTo(ex['математика']), df = daysTo(ex['физика']), hasDiag = Object.keys(S.diag).length > 0;
+  const dm = daysTo(ex['математика']), df = daysTo(ex['физика']), dr = ex['русский'] ? daysTo(ex['русский']) : null, hasDiag = Object.keys(S.diag).length > 0;
   const mins = (today.blocks || []).reduce((a, b) => a + (b.minutes || 0), 0);
   const date = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
   const v = h(`<div class="page" data-title="Сегодня"><div class="home2">
@@ -199,7 +200,7 @@ async function home() {
         ${progressMap()}
       </div>
       <aside class="col-side">
-        <section class="card countdown" aria-label="До экзаменов"><div class="cd"><b data-count="${dm}">${dm}</b><span>${plural(dm, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до математики</span><small>${new Date(ex['математика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div>
+        <section class="card countdown" aria-label="До экзаменов">${dr !== null ? `<div class="cd"><b data-count="${dr}">${dr}</b><span>${plural(dr, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до сочинения</span><small>${new Date(ex['русский']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div>` : ''}<div class="cd"><b data-count="${dm}">${dm}</b><span>${plural(dm, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до математики</span><small>${new Date(ex['математика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div>
           <div class="cd"><b data-count="${df}">${df}</b><span>${plural(df, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до физики</span><small>${new Date(ex['физика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div></section>
         <section class="card forecast"><div class="card-h"><h2>Прогноз баллов</h2><span class="muted ui">цель 90</span></div>
           ${['математика', 'физика'].map((sj) => `<div class="fc"><div class="fc-r"><span>${sj === 'математика' ? 'Математика' : 'Физика'}</span><b data-count="${fc[sj].test}">${fc[sj].test}</b></div><div class="bar"><i style="width:${Math.min(100, fc[sj].test)}%"></i><em style="left:90%" title="цель 90"></em></div></div>`).join('')}
@@ -220,7 +221,7 @@ function todayTitle(d) {
 function blockHTML(b) {
   const n = b.num && App.catalog.find((x) => x.id === b.num);
   const what = b.kind === 'review' ? `Повторение ошибок${b.count ? ` — ${plural(b.count, 'задача', 'задачи', 'задач')}` : ' — пока нечего повторять, реши пару задач прошлых номеров'}`
-    : b.kind === 'number' && n ? `<a href="${numLink(n)}">${n.subject === 'математика' ? 'Математика' : 'Физика'}, №${n.num}. ${esc(n.title)}</a> — ${b.stage === 'с нуля' ? '«Проверить себя» → задачи по типам, теория — кнопкой в задаче' : 'продолжаем задачи по типам'}${n.hasContent ? '' : ' <span class="muted">(разбор готовится)</span>'}`
+    : b.kind === 'number' && n ? `<a href="${numLink(n)}">${SUBJ_SHORT[n.subject] || n.subject}, №${n.num}. ${esc(n.title)}</a> — ${b.stage === 'с нуля' ? '«Проверить себя» → задачи по типам, теория — кнопкой в задаче' : 'продолжаем задачи по типам'}${n.hasContent ? '' : ' <span class="muted">(разбор готовится)</span>'}`
       : b.kind === 'mock' ? `Пробник на 235 минут: ${b.subject}` : `Смешанные задачи: ${b.subject}`;
   return `<li class="tl"><span class="min">${b.minutes}<small>мин</small></span><span class="what">${what}</span></li>`;
 }
@@ -247,11 +248,15 @@ const RU_STEPS = [
 /** Русский — свой раздел: маршрут «как двигаться» вместо сетки карточек */
 function ruSubjectView(nums, hero) {
   const byNum = {}; nums.forEach((n) => (byNum[n.num] = n));
+  const read = App.S.read || {};
+  const readDone = (id) => Object.keys(read).filter((k) => k.startsWith(id + '|') && read[k].status === 'done').length;
   const steps = RU_STEPS.map(([num, title, what], i) => {
     const n = byNum[num]; if (!n) return '';
+    const rd = readDone(n.id);
+    const mark = rd ? `<span class="ru-done">прочитано ${rd}</span>` : '';
     return `<a class="ru-step" href="${numLink(n)}"><span class="ru-dot">${i + 1}</span>` +
       `<span class="ru-step-t"><b>${esc(title)}</b><span>${esc(what)}</span></span>` +
-      `<span class="ru-step-m">~${n.minutes} мин</span><span class="ru-arrow">›</span></a>`;
+      `${mark}<span class="ru-step-m">~${n.minutes} мин</span><span class="ru-arrow">›</span></a>`;
   }).join('');
   return h(`<div class="page" data-title="Русский">
     <div class="sub-hero"><div><p class="eyebrow">${esc(hero.eyebrow)}</p><h1>${esc(hero.name)}</h1>
@@ -294,7 +299,7 @@ function planView() {
   const v = h(`<div class="page" data-title="План"><h1>План до экзаменов</h1>
     <p class="lead">План пересчитывается каждый день: пропустил день — он сам перестроится под даты экзаменов. Напоминаний нет.</p>
     <div class="grid2"><div class="week">${plan.map((d) => { const dt = new Date(d.date + 'T00:00'); return `<div class="day ${d.date === todayIso ? 'today' : ''} ${d.kind}"><span class="d">${wd[dt.getDay()]}, ${dt.getDate()}.${String(dt.getMonth() + 1).padStart(2, '0')}</span><span>${d.kind === 'rest' ? 'Отдых' : d.kind === 'exam' ? `<b>Экзамен: ${d.subject}</b>` : d.blocks.map((b) => blockHTML(b).replace(/<div class="block"><span class="min">(\d+) мин<\/span><span>/, '$1 мин — ').replace(/<\/span><\/div>$/, '')).join('<br>')}</span></div>`; }).join('')}</div>
-    <div><div class="card"><h3>Хватает ли времени</h3>${['математика', 'физика'].map((s) => `<p class="ui">${s}: нужно ${f[s].need} учебных блоков по 70 мин, есть ${f[s].have} до финиша (за 3 недели до экзамена). ${f[s].ok ? '<span style="color:var(--ok)">Успеваем.</span>' : '<span style="color:var(--err)">Не успеваем — добавь учебный день.</span>'}</p>`).join('')}</div>
+    <div><div class="card"><h3>Хватает ли времени</h3>${Object.keys(o.exams).map((s) => `<p class="ui">${s}: нужно ${f[s].need} учебных блоков по 70 мин, есть ${f[s].have} до финиша (за 3 недели до экзамена). ${f[s].ok ? '<span style="color:var(--ok)">Успеваем.</span>' : '<span style="color:var(--err)">Не успеваем — добавь учебный день.</span>'}</p>`).join('')}</div>
     <div class="card"><h3>Настройки плана</h3><form id="plan-form" class="ui" style="display:grid;gap:var(--s3)">
       <fieldset style="border:0;padding:0;margin:0"><legend class="muted" style="margin-bottom:6px">Учебные дни</legend><div class="row">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<label class="check"><input type="checkbox" name="d" value="${d}" ${o.studyDays.includes(d) ? 'checked' : ''}> ${wd[d]}</label>`).join('')}</div></fieldset>
       <label class="field">Математика — дата экзамена<input class="input" type="date" name="em" value="${o.exams['математика']}"></label>
@@ -312,7 +317,7 @@ function planView() {
 // ---------- заметки, закладки, лист формул ----------
 function notesView() {
   const S = App.S, byT = (o) => Object.entries(o).sort((a, b) => b[1].t - a[1].t);
-  const titleOf = (key) => { const n = App.catalog.find((x) => x.id === key.split(':')[0]); return n ? `${n.subject === 'математика' ? 'Математика' : 'Физика'} №${n.num}. ${n.title}` : key; };
+  const titleOf = (key) => { const n = App.catalog.find((x) => x.id === key.split(':')[0]); return n ? `${SUBJ_SHORT[n.subject] || n.subject} №${n.num}. ${n.title}` : key; };
   const linkOf = (key) => { const n = App.catalog.find((x) => x.id === key.split(':')[0]); return n ? numLink(n) : '#/'; };
   const v = h(`<div class="page" data-title="Заметки"><h1>Заметки, закладки, лист формул</h1>
     <div class="grid2"><div><h2>Мой лист формул</h2>${byT(S.formulas).length ? `<div class="list">${byT(S.formulas).map(([k, f]) => `<div class="item"><div class="t">${esc(f.title || titleOf(k))}</div><div class="mathd">${f.tex || ''}</div><button class="btn quiet small no-print" data-unformula="${esc(k)}">Убрать</button></div>`).join('')}</div><p class="row" style="margin-top:var(--s3)"><button class="btn" data-print>Распечатать лист формул (А4)</button></p>` : '<p class="empty">Пусто. В разборе номера нажми «+» рядом с формулой — она появится здесь.</p>'}</div>
