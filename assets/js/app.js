@@ -34,7 +34,7 @@ const ICON = {
   calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11v6M8 15h2M12 15h2"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
 };
-const NAV = [['#/', 'today', 'Сегодня'], ['#/м', 'math', 'Математика'], ['#/ф', 'phys', 'Физика'], ['#/р', 'ru', 'Русский'], ['#/формулы', 'book', 'Формулы'], ['#/план', 'plan', 'План'], ['#/заметки', 'note', 'Заметки']];
+const NAV = [['#/', 'today', 'Сегодня'], ['#/м', 'math', 'Математика'], ['#/ф', 'phys', 'Физика'], ['#/р', 'ru', 'Русский'], ['#/формулы', 'book', 'Формулы'], ['#/заметки', 'note', 'Заметки']];
 const NAV_EXTRA = [['#/диагностика', 'diag', 'Диагностика'], ['#/повтор', 'redo', 'Повторение ошибок'], ['#/настройки', 'gear', 'Настройки']];
 export const icon = (n) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[n] || ''}</svg>`;
 export function toast(text, ms = 2600) { const t = h(`<div class="toast" role="status">${esc(text)}</div>`); document.body.appendChild(t); setTimeout(() => t.remove(), ms); }
@@ -98,7 +98,7 @@ async function enter() {
   startSync(App);
   addEventListener('hashchange', route);
   // пришёл прогресс с другого устройства — перерисовать обзорные страницы (не трогаем номер, чтобы не сбить решение)
-  addEventListener('ege-synced', () => { const hsh = location.hash.replace(/^#\/?/, ''); if (!hsh || /^(м|ф|план|заметки)\/?$/.test(decodeURIComponent(hsh))) route(); });
+  addEventListener('ege-synced', () => { const hsh = location.hash.replace(/^#\/?/, ''); if (!hsh || /^(м|ф|р|заметки|повтор)\/?$/.test(decodeURIComponent(hsh))) route(); });
   route();
   // день занятий: минуты считаем по активному времени на странице
   let last = Date.now(), acc = 0;
@@ -142,7 +142,7 @@ async function route() {
     else if (SUBJ[parts[0]] && parts[1]) {
       const n = App.catalog.find((x) => x.subject === SUBJ[parts[0]] && x.num === +parts[1]);
       view = n ? await renderNumber(App, n, parts[2], parts[3]) : notFound(); // вкладку по умолчанию выбирает сам номер: у математики и физики «задачи», у русского «чтение»
-    } else if (parts[0] === 'план') view = planView();
+    } else if (parts[0] === 'план') { location.replace('#/'); return; } // план убран, старые ссылки ведут на главную
     else if (parts[0] === 'заметки') view = notesView();
     else if (parts[0] === 'формулы') view = await (await import('./spravka.js')).renderRef(App, parts[1]);
     else if (parts[0] === 'настройки') view = settingsView();
@@ -180,30 +180,61 @@ function progressMap() {
 }
 async function home() {
   const S = App.S, ex = planOpts().exams;
-  const today = buildPlan(S, App.catalog, { days: 1, tasksById: App.tasksById, opts: planOpts() })[0];
-  const fc = forecast(S, App.catalog, App.tasksById), st = streak(S, Date.now(), planOpts().studyDays), lv = level(S.xp);
-  const due = dueReviews(S).length;
-  const dm = daysTo(ex['математика']), df = daysTo(ex['физика']), dr = ex['русский'] ? daysTo(ex['русский']) : null, hasDiag = Object.keys(S.diag).length > 0;
-  const mins = (today.blocks || []).reduce((a, b) => a + (b.minutes || 0), 0);
+  const fc = forecast(S, App.catalog, App.tasksById), st = streak(S, Date.now(), DEFAULTS.studyDays), lv = level(S.xp);
+  const due = dueReviews(S).length, hasDiag = Object.keys(S.diag).length > 0;
+  const dm = daysTo(ex['математика']), df = daysTo(ex['физика']), dr = ex['русский'] ? daysTo(ex['русский']) : null;
   const date = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const bySub = (sub) => App.catalog.filter((n) => n.subject === sub);
+  const doneIn = (sub) => bySub(sub).filter((n) => statusOf(n) === 'done').length;
+  const nextOf = (sub) => bySub(sub).slice().sort((a, b) => a.num - b.num).find((n) => statusOf(n) !== 'done');
+  const next = nextOf('русский') || nextOf('математика') || nextOf('физика');
+  const pc = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  const pd = (n) => plural(n, 'день', 'дня', 'дней').replace(/^\d+ /, '');
+  const dt = (iso) => new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  const tiles = [];
+  if (due) tiles.push(['#/повтор', 'Повторить ошибки', plural(due, 'задача', 'задачи', 'задач') + ' ждут повторения', 'redo']);
+  tiles.push(['#/р', 'Русский: аргументы', doneIn('русский') + ' из ' + bySub('русский').length + ' разделов · 36 произведений', 'ru']);
+  tiles.push(['#/р/6', 'Проверить сочинение', 'слова, абзацы, ритм и ошибки', 'note']);
+  if (!hasDiag) tiles.push(['#/диагностика', 'Пройти диагностику', 'покажет, с чего начать в математике и физике', 'diag']);
+  const nm = nextOf('математика'), nf = nextOf('физика');
+  if (nm) tiles.push([numLink(nm), 'Математика, №' + nm.num, esc(nm.title), 'math']);
+  if (nf) tiles.push([numLink(nf), 'Физика, №' + nf.num, esc(nf.title), 'phys']);
   const v = h(`<div class="page" data-title="Сегодня"><div class="home2">
-    <header class="hero"><div class="hero-t"><p class="eyebrow">${esc(date)}</p><h1 id="today-h">${today.kind === 'rest' ? 'Сегодня отдых' : today.kind === 'mock' ? 'Сегодня пробник' : 'План на сегодня'}</h1>
-      <p class="lead">${mins ? `${mins} минут занятий. ` : ''}Сначала задачи — теория открывается прямо в задаче.</p>
-      <div class="hero-stats"><span><b data-count="${mastered('математика')}">${mastered('математика')}</b> из 20 по математике</span><span><b data-count="${mastered('физика')}">${mastered('физика')}</b> из 26 по физике</span><span><b data-count="${mastered('русский')}">${mastered('русский')}</b> из ${App.catalog.filter((n) => n.subject === 'русский').length} по русскому</span><span><b data-count="${S.xp}">${S.xp}</b> опыта</span></div></div>
-      ${solidHTML()}</header>
+    <header class="hero dash-hero">
+      <div class="hero-t">
+        <p class="eyebrow">${esc(date)}</p>
+        <h1>${dr !== null ? 'До сочинения <em>' + dr + '</em> ' + pd(dr) : 'ЕГЭ курс 2027'}</h1>
+        <p class="lead">${dr !== null ? 'Ближайший экзамен — итоговое сочинение, ' + dt(ex['русский']) + '. Дальше математика ' + dt(ex['математика']) + ' и физика ' + dt(ex['физика']) + '.' : 'Математика, физика и русский — в одном месте.'}</p>
+        <div class="dash-go">
+          ${due ? `<a class="btn primary" href="#/повтор">Повторить ошибки: ${due}</a>` : next ? `<a class="btn primary" href="${numLink(next)}">Продолжить: ${SUBJ_SHORT[next.subject]} №${next.num}</a>` : ''}
+          <a class="btn" href="#/р">Русский</a><a class="btn" href="#/м">Математика</a><a class="btn" href="#/ф">Физика</a>
+        </div>
+        <div class="hero-stats">
+          <span><b data-count="${doneIn('математика')}">${doneIn('математика')}</b> из ${bySub('математика').length} по математике</span>
+          <span><b data-count="${doneIn('физика')}">${doneIn('физика')}</b> из ${bySub('физика').length} по физике</span>
+          <span><b data-count="${doneIn('русский')}">${doneIn('русский')}</b> из ${bySub('русский').length} по русскому</span>
+          <span><b data-count="${S.xp}">${S.xp}</b> опыта</span>
+        </div>
+      </div>
+      ${solidHTML()}
+    </header>
+    <section class="dash-cd">
+      ${dr !== null ? `<a class="dash-cd-i near" href="#/р"><b data-count="${dr}">${dr}</b><span>${pd(dr)} до сочинения</span><small>${dt(ex['русский'])}</small></a>` : ''}
+      <a class="dash-cd-i" href="#/м"><b data-count="${dm}">${dm}</b><span>${pd(dm)} до математики</span><small>${dt(ex['математика'])}</small></a>
+      <a class="dash-cd-i" href="#/ф"><b data-count="${df}">${df}</b><span>${pd(df)} до физики</span><small>${dt(ex['физика'])}</small></a>
+    </section>
     <div class="home-grid">
       <div class="col-main">
-        ${hasDiag ? '' : `<section class="callout"><div><b>Начни с диагностики</b><p>По 1–2 задачи на каждый номер — план начнёт со слабых мест.</p></div><a class="btn primary" href="#/диагностика">Пройти диагностику</a></section>`}
-        <section class="card plan" aria-labelledby="plan-h"><div class="card-h"><h2 id="plan-h">Занятие</h2><span class="muted ui">${mins ? mins + ' мин' : ''}</span></div>
-          <ol class="timeline">${(today.blocks || []).map(blockHTML).join('') || '<li class="muted">Сегодня по плану отдых. Можно повторить ошибки или решить пару задач.</li>'}</ol>
-          <div class="row"><a class="btn primary" href="${hasDiag ? startHref(today, due) : '#/диагностика'}">${hasDiag ? 'Начать занятие' : 'Сначала диагностика'}</a>${due ? `<a class="btn" href="#/повтор">Повторить ошибки: ${due}</a>` : ''}</div></section>
+        <h2 class="dash-h">Продолжить</h2>
+        <div class="dash-tiles">${tiles.map(([href, t, s, ic]) => `<a class="dash-tile" href="${href}"><span class="dash-ic">${icon(ic)}</span><span class="dash-tt"><b>${t}</b><span>${s}</span></span><span class="dash-ar">›</span></a>`).join('')}</div>
         ${progressMap()}
       </div>
       <aside class="col-side">
-        <section class="card countdown" aria-label="До экзаменов">${dr !== null ? `<div class="cd"><b data-count="${dr}">${dr}</b><span>${plural(dr, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до сочинения</span><small>${new Date(ex['русский']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div>` : ''}<div class="cd"><b data-count="${dm}">${dm}</b><span>${plural(dm, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до математики</span><small>${new Date(ex['математика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div>
-          <div class="cd"><b data-count="${df}">${df}</b><span>${plural(df, 'день', 'дня', 'дней').replace(/^\d+ /, '')} до физики</span><small>${new Date(ex['физика']).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</small></div></section>
+        <section class="card dash-rings"><div class="card-h"><h2>Освоено</h2></div>
+          ${[['математика', 'м'], ['физика', 'ф'], ['русский', 'р']].map(([sub, lt]) => { const a = bySub(sub).length, dd = doneIn(sub), p = pc(dd, a); return `<a class="dash-ring" href="#/${lt}"><span class="ring" style="--p:${p}"><span>${p}%</span></span><b>${SUBJ_SHORT[sub]}</b><span class="muted ui">${dd} из ${a}</span></a>`; }).join('')}
+        </section>
         <section class="card forecast"><div class="card-h"><h2>Прогноз баллов</h2><span class="muted ui">цель 90</span></div>
-          ${['математика', 'физика'].map((sj) => `<div class="fc"><div class="fc-r"><span>${sj === 'математика' ? 'Математика' : 'Физика'}</span><b data-count="${fc[sj].test}">${fc[sj].test}</b></div><div class="bar"><i style="width:${Math.min(100, fc[sj].test)}%"></i><em style="left:90%" title="цель 90"></em></div></div>`).join('')}
+          ${['математика', 'физика'].map((sj) => `<div class="fc"><div class="fc-r"><span>${SUBJ_SHORT[sj]}</span><b data-count="${fc[sj].test}">${fc[sj].test}</b></div><div class="bar"><i style="width:${Math.min(100, fc[sj].test)}%"></i><em style="left:90%" title="цель 90"></em></div></div>`).join('')}
           <p class="muted ui small">Освоенные номера × баллы по шкале 2026.</p></section>
         <section class="card mini"><div><b data-count="${st}">${st}</b><span>серия дней</span></div><div><b>${lv.lv}</b><span>уровень</span><div class="bar"><i style="width:${((lv.xp - lv.prev) / (lv.next - lv.prev)) * 100}%"></i></div></div></section>
       </aside>
