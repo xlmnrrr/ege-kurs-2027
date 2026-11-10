@@ -277,11 +277,13 @@ export async function renderNumber(App_, n, tab, arg) {
   const secsHTML = secs.map((x) => x.group
     ? `<h2 class="th-group" id="th-${x.k}">${esc(x.s.title)}</h2>`
     : (fold
-      ? `<details class="th-sec th-fold" id="th-${x.k}"><summary><h3>${esc(x.s.title)}</h3></summary><div class="th-body">${x.s.html}</div></details>`
+      ? `<details class="th-sec th-fold" id="th-${x.k}"><summary><h3>${esc(x.s.title)}</h3><span class="ru-badge" data-badge="${x.k}"></span></summary><div class="th-body">${x.s.html}` +
+        `<div class="ru-read no-print" data-read-key="${esc(n.id + '|' + x.s.title)}"><button class="btn small" data-r="reading">Читаю</button><button class="btn small" data-r="done">Прочитано</button><span class="ru-read-hint muted ui"></span></div></div></details>`
       : `<section class="th-sec" id="th-${x.k}"><h3>${esc(x.s.title)}</h3>${x.s.html}</section>`)).join('');
   const art = h(`<article class="doc theory">${doc.intro.join('')}
     ${doc.formulas ? `<details class="formulas-box" ${tab === 'шпаргалка' ? 'open' : ''}><summary class="ui">Формулы номера</summary><div class="formulas">${doc.formulas}</div></details>` : ''}
     <nav class="toc no-print">${fold ? '<b class="toc-h">Содержание</b>' : ''}${fold ? tocHTML : doc.theory.map((s, k) => `<a href="#" data-go="${k}">${esc(s.title)}</a>`).join('')}</nav>
+    ${fold ? `<div class="ru-readbox no-print"><div class="ru-rb-col"><b>Читаю <span data-cnt="reading">0</span></b><div class="ru-rb-list" data-list="reading"></div></div><div class="ru-rb-col"><b>Прочитано <span data-cnt="done">0</span></b><div class="ru-rb-list" data-list="done"></div></div></div>` : ''}
     ${fold ? secsHTML : doc.theory.map((s, k) => `<section class="th-sec" id="th-${k}"><h3>${esc(s.title)}</h3>${s.html}</section>`).join('')}
     ${tab === 'шпаргалка' ? doc.types.map((t) => `<section class="th-sec"><h3>Тип ${t.id.slice(1)}. ${esc(t.title)}</h3>${t.html}</section>`).join('') : ''}
     ${doc.tail.join('')}</article>`);
@@ -291,6 +293,33 @@ export async function renderNumber(App_, n, tab, arg) {
     body.prepend(bar);
     bar.querySelector('[data-unfold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = true));
     bar.querySelector('[data-fold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = false));
+    // журнал чтения: «Читаю» -> «Прочитано», списки над разделами
+    const boxes = [...art.querySelectorAll('.ru-read')];
+    const st = (key) => (App.S.read && App.S.read[key] ? App.S.read[key].status : null);
+    const syncRead = () => {
+      boxes.forEach((b) => {
+        const s2 = st(b.getAttribute('data-read-key'));
+        b.querySelectorAll('[data-r]').forEach((btn) => btn.setAttribute('aria-pressed', String(btn.getAttribute('data-r') === s2)));
+        b.querySelector('.ru-read-hint').textContent = s2 === 'done' ? 'прочитано' : s2 === 'reading' ? 'читаю' : '';
+        const sec = b.closest('details'), bd = sec && sec.querySelector('[data-badge]');
+        if (bd) { bd.textContent = s2 === 'done' ? 'прочитано' : s2 === 'reading' ? 'читаю' : ''; bd.className = 'ru-badge' + (s2 ? ' on ' + s2 : ''); }
+      });
+      ['reading', 'done'].forEach((k) => {
+        const list = art.querySelector('[data-list="' + k + '"]'), cnt = art.querySelector('[data-cnt="' + k + '"]');
+        const items = boxes.filter((b) => st(b.getAttribute('data-read-key')) === k);
+        if (cnt) cnt.textContent = items.length;
+        if (!list) return;
+        list.innerHTML = items.length ? items.map((b) => { const d = b.closest('details'), t = d.querySelector('summary h3').textContent; return `<a href="#" data-jump="${d.id}">${esc(t)}</a>`; }).join('') : '<span class="muted ui">пусто</span>';
+        list.querySelectorAll('[data-jump]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); const d = art.querySelector('#' + CSS.escape(a.getAttribute('data-jump'))); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }));
+      });
+    };
+    boxes.forEach((b) => b.querySelectorAll('[data-r]').forEach((btn) => (btn.onclick = async () => {
+      const key = b.getAttribute('data-read-key'), want = btn.getAttribute('data-r'), cur = st(key);
+      const title = b.closest('details').querySelector('summary h3').textContent;
+      await record('read', { key, status: cur === want ? null : want, title, num: n.id });
+      syncRead();
+    })));
+    syncRead();
     const list = App.catalog.filter((x) => x.subject === 'русский').sort((x, y) => x.num - y.num);
     const i = list.findIndex((x) => x.id === n.id), prev = list[i - 1], next = list[i + 1];
     body.appendChild(h(`<div class="ru-pager no-print">` +

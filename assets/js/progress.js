@@ -6,7 +6,7 @@ export const dayKey = (t) => { const d = new Date(t); return `${d.getFullYear()}
 export const startOfDay = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
 export function fold(events) {
-  const s = { tasks: {}, numbers: {}, notes: {}, marks: {}, formulas: {}, days: {}, mocks: [], diag: {}, settings: {}, xp: 0 };
+  const s = { tasks: {}, numbers: {}, notes: {}, marks: {}, formulas: {}, read: {}, days: {}, mocks: [], diag: {}, settings: {}, xp: 0 };
   const sorted = [...events].sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
   for (const e of sorted) {
     const d = e.data || {};
@@ -34,15 +34,17 @@ export function fold(events) {
       case 'note': if (d.text) s.notes[d.key] = { text: d.text, t: e.t, title: d.title }; else delete s.notes[d.key]; break;
       case 'mark': if (d.on) s.marks[d.key] = { t: e.t, title: d.title }; else delete s.marks[d.key]; break;
       case 'formula': if (d.on) s.formulas[d.key] = { t: e.t, tex: d.tex, title: d.title }; else delete s.formulas[d.key]; break;
+      // чтение (русский): status = 'reading' (читаю) или 'done' (прочитано); last write wins
+      case 'read': if (d.status) s.read[d.key] = { status: d.status, t: e.t, title: d.title, num: d.num }; else delete s.read[d.key]; break;
       case 'day': (s.days[d.date] ||= { minutes: 0, tasks: 0 }).minutes += d.minutes || 0; break;
       case 'mock': s.mocks.push({ ...d, t: e.t }); break;
       case 'setting': s.settings[d.key] = d.value; break;
       case 'reset': { // сброс прогресса: всё (как новый сайт, настройки остаются) или один предмет; события после сброса считаются заново
-        if (d.scope === 'всё') { const keep = s.settings; Object.assign(s, { tasks: {}, numbers: {}, notes: {}, marks: {}, formulas: {}, days: {}, mocks: [], diag: {}, xp: 0 }); s.settings = keep; break; }
+        if (d.scope === 'всё') { const keep = s.settings; Object.assign(s, { tasks: {}, numbers: {}, notes: {}, marks: {}, formulas: {}, read: {}, days: {}, mocks: [], diag: {}, xp: 0 }); s.settings = keep; break; }
         const pre = d.scope === 'физика' ? 'f' : 'm', sp = d.scope === 'физика' ? ['sp-f'] : ['sp-a', 'sp-g'];
         const hit = (k) => (k.startsWith(pre) && /^[mf]\d/.test(k)) || sp.some((x) => k.startsWith(x));
         for (const [id, t] of Object.entries(s.tasks)) if (hit(t.num || id)) { s.xp = Math.max(0, s.xp - (t.xp || 0)); delete s.tasks[id]; }
-        for (const o of [s.numbers, s.diag, s.notes, s.marks, s.formulas]) for (const k of Object.keys(o)) if (hit(k)) delete o[k];
+        for (const o of [s.numbers, s.diag, s.notes, s.marks, s.formulas, s.read]) for (const k of Object.keys(o)) if (hit(k)) delete o[k];
         s.mocks = s.mocks.filter((m) => m.subject && m.subject !== d.scope);
         break;
       }
