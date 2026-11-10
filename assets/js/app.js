@@ -237,24 +237,30 @@ export function statusOf(n) {
 }
 
 // ---------- предмет ----------
-const RU_GROUPS = [
-  ['Начать с нуля', [1, 8]],
-  ['Писать сочинение', [2, 3]],
-  ['Темы: что могут спросить', [4, 5, 6]],
-  ['Аргументы: что учить', [7]],
+const RU_STEPS = [
+  [1, 'Каркас', 'Из чего состоит сочинение: четыре абзаца, критерии зачёта и чек-лист перед сдачей.'],
+  [2, 'Что могут спросить', 'Три раздела, одиннадцать подразделов и живые формулировки тем.'],
+  [3, 'Аргументы', 'Главное: 36 произведений по уровням важности, с готовыми аргументами.'],
+  [4, 'Как писать', 'Клише, связки между абзацами и двенадцать правил пунктуации.'],
+  [5, 'Расписание', 'План на 30 дней и как сжать его под 22 дня до экзамена.'],
 ];
-/** Русский — свой раздел: короткая главная, содержание под кнопкой, всё свёрнуто по умолчанию */
+/** Русский — свой раздел: маршрут «как двигаться» вместо сетки карточек */
 function ruSubjectView(nums, hero) {
   const byNum = {}; nums.forEach((n) => (byNum[n.num] = n));
-  const row = (n) => n ? `<a class="ru-row" href="${numLink(n)}"><span class="ru-n">${n.num}</span><span class="ru-t"><b>${esc(n.title)}</b><span class="ru-a">${esc(n.about || '')}</span></span><span class="ru-m">~${n.minutes} мин</span></a>` : '';
-  const groups = RU_GROUPS.map(([title, list]) => `<details class="ru-group"><summary><b>${esc(title)}</b><span class="muted ui">${list.length}</span></summary><div class="ru-list">${list.map((k) => row(byNum[k])).join('')}</div></details>`).join('');
-  const quick = [1, 7, 4].map((k) => byNum[k]).filter(Boolean).map((n) => `<a href="${numLink(n)}"><b>${esc(n.title)}</b><span>${esc(n.about || '')}</span></a>`).join('');
+  const steps = RU_STEPS.map(([num, title, what], i) => {
+    const n = byNum[num]; if (!n) return '';
+    return `<a class="ru-step" href="${numLink(n)}"><span class="ru-dot">${i + 1}</span>` +
+      `<span class="ru-step-t"><b>${esc(title)}</b><span>${esc(what)}</span></span>` +
+      `<span class="ru-step-m">~${n.minutes} мин</span><span class="ru-arrow">›</span></a>`;
+  }).join('');
   return h(`<div class="page" data-title="Русский">
     <div class="sub-hero"><div><p class="eyebrow">${esc(hero.eyebrow)}</p><h1>${esc(hero.name)}</h1>
-      <p class="lead">${esc(hero.lead)}</p>
+      <p class="lead">Полный курс к итоговому сочинению: пять разделов и 36 произведений с готовыми аргументами.</p>
       <p class="muted ui">Экзамен 2 декабря 2026 · 3 часа 55 минут · минимум 250 слов, лучше 350</p></div></div>
-    <section class="card"><h3>С чего начать</h3><div class="ru-quick">${quick}</div></section>
-    <details class="ru-index"><summary><b>Содержание курса</b><span class="muted ui">${nums.length} разделов</span></summary><div class="ru-groups">${groups}</div></details>
+    <section class="card"><h3>Как двигаться</h3>
+      <p class="muted ui" style="margin-top:0">Проходи по порядку: от каркаса к аргументам. Это около трёх с половиной часов чтения, дальше только повторение.</p>
+      <div class="ru-road">${steps}</div></section>
+    <div class="note ui no-print">Не знаешь, с чего начать, — открой <b>шаг 1</b>. Тридцати минут хватит, чтобы понять, как устроено сочинение и за что дают зачёт.</div>
   </div>`);
 }
 

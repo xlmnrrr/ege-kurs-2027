@@ -322,3 +322,23 @@ details.crit table { margin-top: var(--s2); }
   .doc.theory .th-sec.th-fold>summary h3{font-size:15px}
 }
 
+
+/* Русский: маршрут «как двигаться» и переходы между разделами */
+.ru-road{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.ru-step{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid rgba(255,255,255,.10);border-radius:12px;text-decoration:none;color:inherit;transition:border-color .15s,background .15s}
+.ru-step:hover{border-color:rgba(233,176,98,.55);background:rgba(255,255,255,.03)}
+.ru-dot{flex:none;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;background:rgba(233,176,98,.16);color:#E9B062}
+.ru-step-t{flex:1;min-width:0}
+.ru-step-t b{display:block;font-size:15.5px;margin-bottom:3px}
+.ru-step-t span{display:block;font-size:13px;opacity:.66;line-height:1.45}
+.ru-step-m{flex:none;font-size:12px;opacity:.5;white-space:nowrap}
+.ru-arrow{flex:none;opacity:.3;font-size:20px;line-height:1}
+.ru-pager{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:26px;padding-top:18px;border-top:1px solid rgba(255,255,255,.10)}
+.ru-pager .btn{max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:520px){
+  .ru-step{padding:12px 13px;gap:11px;align-items:flex-start}
+  .ru-dot{width:26px;height:26px;font-size:13px;margin-top:1px}
+  .ru-arrow{display:none}
+  .ru-pager .btn{max-width:100%;flex:1 1 100%;text-align:center}
+}
+

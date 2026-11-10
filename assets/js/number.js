@@ -291,6 +291,12 @@ export async function renderNumber(App_, n, tab, arg) {
     body.prepend(bar);
     bar.querySelector('[data-unfold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = true));
     bar.querySelector('[data-fold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = false));
+    const list = App.catalog.filter((x) => x.subject === 'русский').sort((x, y) => x.num - y.num);
+    const i = list.findIndex((x) => x.id === n.id), prev = list[i - 1], next = list[i + 1];
+    body.appendChild(h(`<div class="ru-pager no-print">` +
+      (prev ? `<a class="btn" href="${numLink(prev)}">← ${esc(prev.title)}</a>` : '<span></span>') +
+      (next ? `<a class="btn primary" href="${numLink(next)}">${esc(next.title)} →</a>` : '<span></span>') +
+      `</div>`));
   }
   art.querySelectorAll('[data-go]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); art.querySelector('#th-' + a.dataset.go)?.scrollIntoView({ behavior: 'smooth' }); }));
   drawFigs(art, figs);
