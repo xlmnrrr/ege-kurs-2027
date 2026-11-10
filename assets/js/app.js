@@ -1,5 +1,5 @@
 // «ЕГЭ курс 2027» — оболочка: вход, шапка, маршруты (#/…), главная, предмет, план, заметки, настройки.
-import { unlock, openJSON } from './crypto.js';
+import { unlock, openJSON, rewrapKeys } from './crypto.js';
 import * as store from './store.js';
 import { fold, dueReviews, streak, level, forecast, mastery, dayKey } from './progress.js';
 import { buildPlan, feasibility, DEFAULTS } from './plan.js';
@@ -57,6 +57,9 @@ const planOpts = () => ({ studyDays: setting('studyDays', DEFAULTS.studyDays), m
 let fails = 0, blockedUntil = 0;
 // Аккаунт = имя + пароль: из них выводится ключ, которым обёрнут ключ данных (имя без учёта регистра и пробелов по краям)
 const account = (name, password) => `${String(name).trim().toLowerCase()}\n${password}`;
+// имя последнего входа и признак «вход изменён здесь, но ещё не отправлен в репозиторий»
+const savedLogin = () => { try { return localStorage.getItem('ege-login') || ''; } catch { return ''; } };
+const isLocalKeys = () => { try { return !!localStorage.getItem('ege-keys'); } catch { return false; } };
 
 function lockView() {
   $('#top').hidden = true;
@@ -82,6 +85,7 @@ function lockView() {
     try {
       const k = await unlock(account(form.username.value, form.password.value), App.keys);
       if (form.remember.checked) await store.put('keys', k, 'K');
+      try { localStorage.setItem('ege-login', form.username.value.trim()); } catch { /* приватный режим */ }
       App.K = k; fails = 0; await enter();
     } catch (x) {
       fails++; if (fails >= 5) { blockedUntil = Date.now() + 30000; fails = 0; }
@@ -375,7 +379,22 @@ function settingsView() {
       <div class="row"><label class="field" style="min-width:200px">Что сбросить<select class="input" data-rscope><option value="математика">Только математику</option><option value="физика">Только физику</option><option value="всё">Весь прогресс</option></select></label>
       <label class="field" style="min-width:200px"><span data-rq></span><input class="input" inputmode="numeric" data-rans autocomplete="off"></label></div>
       <div class="row" style="margin-top:var(--s2)"><button class="btn danger" data-reset disabled>Сбросить</button><span class="muted ui" data-rmsg></span></div></div>
-    <div class="card"><h3>Аккаунт и устройство</h3><p class="ui">Вход — имя и пароль; прогресс общий для всех устройств, где выполнен вход. Имя и пароль меняются на компьютере командой <code>node tools/set-password.mjs --name ИМЯ</code> (контент перешифровывать не нужно). Это устройство ${App.K ? 'запомнено' : 'не запомнено'}.</p>
+    <div class="card"><h3>Имя и пароль для входа</h3>
+      <p class="ui">Сейчас вход: <b>${esc(savedLogin() || 'неизвестно')}</b>. Вход — это ключ к курсу: при смене меняется только замок, сам курс не перешифровывается, прогресс остаётся.</p>
+      <form data-authform style="display:grid;gap:var(--s3);max-width:400px">
+        <label class="field">Текущее имя<input class="input" name="oldname" autocomplete="username" autocapitalize="none" required></label>
+        <label class="field">Текущий пароль<input class="input" type="password" name="oldpass" autocomplete="current-password" required></label>
+        <label class="field">Новое имя<input class="input" name="newname" autocomplete="off" autocapitalize="none" required></label>
+        <label class="field">Новый пароль<input class="input" type="password" name="newpass" autocomplete="new-password" required></label>
+        <label class="field">Новый пароль ещё раз<input class="input" type="password" name="newpass2" autocomplete="new-password" required></label>
+        <p class="err ui" data-autherr role="alert"></p>
+        <div class="row"><button class="btn primary" type="submit">Сменить вход</button><span class="muted ui" data-authmsg></span></div>
+      </form>
+      <div data-authfile></div>
+      <p class="muted ui" style="font-size:13.5px;margin-top:10px">Новый вход сразу работает на этом устройстве. Чтобы он работал на iPhone и везде, скачай файл и положи его вместо <code>сайт\data\keys.json</code>, затем <code>git add data/keys.json &amp;&amp; git commit -m "смена входа" &amp;&amp; git push</code>.</p>
+      ${isLocalKeys() ? '<div class="row" style="margin-top:10px"><button class="btn" data-authreset>Вернуть вход, как на сайте</button><span class="muted ui">отменит смену, сделанную здесь</span></div>' : ''}
+    </div>
+    <div class="card"><h3>Устройство</h3><p class="ui">Это устройство ${App.K ? 'запомнено' : 'не запомнено'}. На запомненном устройстве пароль не спрашивают: ключ хранится в браузере, и прочитать его из кода нельзя.</p>
       <button class="btn" data-logout>Выйти на этом устройстве</button></div>
     <p class="muted ui" style="font-size:13px">Версия контента: ${esc(App.version?.v || '—')}</p></div>`);
   $('[data-sync]', v).onclick = async () => { await syncNow(true); route(); };
@@ -406,6 +425,35 @@ function settingsView() {
     const f = e.target.files[0]; if (!f) return;
     try { const { events } = JSON.parse(await f.text()); await store.putMany('events', events); await store.putMany('outbox', events); await refreshState(); toast(`Загружено событий: ${events.length}`); route(); } catch { toast('Файл не похож на прогресс курса'); }
   };
+  const authForm = $('[data-authform]', v);
+  authForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const err = $('[data-autherr]', v), msg = $('[data-authmsg]', v);
+    const oldName = authForm.oldname.value, oldPass = authForm.oldpass.value;
+    const newName = authForm.newname.value.trim(), p1 = authForm.newpass.value, p2 = authForm.newpass2.value;
+    err.textContent = ''; msg.textContent = '';
+    if (!newName) { err.textContent = 'Новое имя не может быть пустым.'; return; }
+    if (!p1) { err.textContent = 'Новый пароль не может быть пустым.'; return; }
+    if (p1 !== p2) { err.textContent = 'Новые пароли не совпали.'; return; }
+    if (account(oldName, oldPass) === account(newName, p1)) { err.textContent = 'Это тот же самый вход — менять нечего.'; return; }
+    try {
+      const nk = await rewrapKeys(App.keys, account(oldName, oldPass), account(newName, p1));
+      await unlock(account(newName, p1), nk);          // проверяем, что новым входом ключ действительно разворачивается
+      if (App.K) await store.put('keys', App.K, 'K');   // ключ данных тот же, поэтому устройство остаётся запомненным
+      App.keys = nk;
+      try { localStorage.setItem('ege-keys', JSON.stringify(nk)); localStorage.setItem('ege-login', newName); } catch { /* приватный режим */ }
+      msg.textContent = 'Готово: вход сменён на этом устройстве.';
+      const box = $('[data-authfile]', v); box.innerHTML = '';
+      const dl = document.createElement('a'); dl.className = 'btn primary'; dl.download = 'keys.json';
+      dl.href = URL.createObjectURL(new Blob([JSON.stringify(nk, null, 1)], { type: 'application/json' }));
+      dl.textContent = 'Скачать keys.json для сайта'; box.appendChild(dl);
+      toast('Вход сменён'); authForm.reset();
+    } catch (x) {
+      err.textContent = x.message === 'PASSWORD' ? 'Текущее имя или пароль не подошли.' : 'Не получилось: ' + x.message;
+    }
+  };
+  const arBtn = $('[data-authreset]', v);
+  if (arBtn) arBtn.onclick = () => { try { localStorage.removeItem('ege-keys'); localStorage.removeItem('ege-login'); } catch { /* приватный режим */ } toast('Возвращаю вход сайта…'); setTimeout(() => location.reload(), 600); };
   $('[data-logout]', v).onclick = async () => { await store.del('keys', 'K'); App.K = null; location.hash = ''; location.reload(); };
   return v;
 }
@@ -431,7 +479,10 @@ async function boot() {
     });
   }
   try {
-    App.keys = await (await fetch('data/keys.json', { cache: 'no-store' })).json();
+    // если вход меняли в настройках, а файл ещё не отправлен в репозиторий — берём локальную версию
+    let localKeys = null;
+    try { const raw = localStorage.getItem('ege-keys'); if (raw) localKeys = JSON.parse(raw); } catch { /* приватный режим */ }
+    App.keys = localKeys || await (await fetch('data/keys.json', { cache: 'no-store' })).json();
     App.version = await (await fetch('data/version.json', { cache: 'no-store' })).json().catch(() => null);
   } catch { $('#main').innerHTML = '<div class="page"><h1>Нет связи</h1><p class="lead">Первый раз курс нужно открыть с интернетом.</p></div>'; return; }
   const k = await store.get('keys', 'K').catch(() => null);

@@ -54,6 +54,16 @@ export async function unlock(password, keys) {
   return k;
 }
 
+/** Смена входа: разворачиваем ключ данных старым аккаунтом и заворачиваем новым (сам курс не перешифровывается) */
+export async function rewrapKeys(keys, oldAccount, newAccount) {
+  const oldKek = await kekFrom(oldAccount, unb64(keys.salt), keys.iter);
+  let raw;
+  try { raw = await open(oldKek, unb64(keys.wrapped)); } catch { throw new Error('PASSWORD'); }
+  const next = await wrapK(raw, newAccount);
+  raw.fill(0);
+  return next;
+}
+
 /** Токен синхронизации: HMAC(K-производный, "sync") — сервер видит только его хэш */
 export async function syncToken(k) {
   const probe = await subtle.encrypt({ name: 'AES-GCM', iv: new Uint8Array(12) }, k, enc.encode('sync-token-v1'));
