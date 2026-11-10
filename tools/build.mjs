@@ -31,6 +31,7 @@ function blockHTML(type, arg, body, ctx) {
   }
   if (type === 'ловушка') return `<aside class="trap"><b>Ловушка.</b> ${mdText(body).replace(/^<p>|<\/p>$/g, '')}</aside>`;
   if (type === 'аргумент') return `<div class="arg-card">${mdText(body)}</div>`; // карточка готового аргумента (русский)
+  if (type === 'проверка') return '<div class="essay-check"></div>'; // живая проверка сочинения (русский)
   if (type === 'подсказка' || type === 'важно') return `<aside class="${type === 'важно' ? 'key' : 'hint'}">${mdText(body)}</aside>`;
   if (type === 'критерии') return `<div class="criteria">${mdText(body)}</div>`;
   warn.push(`${ctx.id}: неизвестный блок ::: ${type}`);

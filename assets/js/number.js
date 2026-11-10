@@ -84,6 +84,73 @@ export function checkAnswer(given, task) {
   return g === a;
 }
 
+
+/** Проверка сочинения: живые цифры по тексту, который ученик вставил сам (русский) */
+const AI_MARKERS = ['играет ключевую роль','играет важную роль','выступает символом','подчеркивает важность','подчёркивает важность','в современном мире','важно отметить','важно подчеркнуть','стоит подчеркнуть','необходимо учитывать','следует отметить','данный','является','осуществляется','представляет собой','более того','кроме того','таким образом','подводя итог','в заключение','многогранный','углубляться','гобелен','дотошный','знаковый','парадигма','релевантный','концептуальный','символизирует','олицетворяет','резюмируя'];
+function mountEssayCheck(host) {
+  host.innerHTML = `<div class="ec-head"><h3>Проверь своё сочинение</h3><p class="muted ui">Вставь текст — проверка идёт сама, ничего никуда не отправляется.</p></div>` +
+    `<div class="ec-timer no-print"><button class="btn" data-timer>Таймер 3:55</button><b data-timerv>3:55</b><span class="muted ui">как на экзамене</span></div>` +
+    `<textarea class="ec-text" placeholder="Вставь сюда своё сочинение..."></textarea>` +
+    `<div class="ec-stats"></div><div class="ec-res"></div>`;
+  const ta = host.querySelector('.ec-text'), stats = host.querySelector('.ec-stats'), res = host.querySelector('.ec-res');
+  let tick = null, left = 235;
+  const btn = host.querySelector('[data-timer]'), tv = host.querySelector('[data-timerv]');
+  const show = () => { tv.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'); tv.className = left <= 15 ? 'bad' : ''; };
+  btn.onclick = () => {
+    if (tick) { clearInterval(tick); tick = null; btn.textContent = 'Таймер 3:55'; return; }
+    left = 235; show(); btn.textContent = 'Стоп';
+    tick = setInterval(() => { left--; show(); if (left <= 0) { clearInterval(tick); tick = null; btn.textContent = 'Таймер 3:55'; toast('Время вышло — 3 часа 55 минут'); } }, 1000);
+  };
+  const words = (t) => (t.match(/[А-Яа-яЁёA-Za-z]+(?:-[А-Яа-яЁёA-Za-z]+)?/g) || []);
+  const analyze = () => {
+    const t = ta.value;
+    if (!t.trim()) { stats.innerHTML = ''; res.innerHTML = ''; return; }
+    const w = words(t), n = w.length;
+    const sents = t.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+(?=[А-ЯЁA-Z"])/).filter((x) => x.trim());
+    const lens = sents.map((x) => words(x).length);
+    const mean = lens.length ? lens.reduce((a, b) => a + b, 0) / lens.length : 0;
+    let sd = 0; if (lens.length > 1) { let v = 0; for (const L of lens) v += (L - mean) ** 2; sd = Math.sqrt(v / lens.length); }
+    const shortN = lens.filter((x) => x <= 5).length, longN = lens.filter((x) => x >= 25).length;
+    const paras = t.split(/\n\s*\n/).filter((x) => x.trim()).length;
+    const low = t.toLowerCase(), found = AI_MARKERS.filter((m) => low.includes(m));
+    const typo = [];
+    if (t.includes('\u2014')) typo.push('длинное тире');
+    if (t.includes('\u2026')) typo.push('многоточие-символ');
+    if (t.includes('\u00ab') || t.includes('\u00bb')) typo.push('кавычки-ёлочки');
+    if (t.includes('\u00a0')) typo.push('неразрывные пробелы');
+    if (t.includes('**')) typo.push('звёздочки markdown');
+    const first = t.trim()[0];
+    stats.innerHTML = `<span class="ec-s">Слов <b>${n}</b></span><span class="ec-s">Абзацев <b>${paras}</b></span><span class="ec-s">Предложений <b>${sents.length}</b></span><span class="ec-s">Длина <b>${lens.length ? Math.min(...lens) : 0}–${lens.length ? Math.max(...lens) : 0}</b></span><span class="ec-s">Ритм <b>${sd.toFixed(1)}</b></span><span class="ec-s">Коротких <b>${shortN}</b></span>`;
+    const line = (good, text) => `<div class="ec-line ${good ? 'ok' : 'warn'}"><b>${good ? '✓' : '!'}</b><span>${text}</span></div>`;
+    let h = '';
+    h += n < 250 ? line(false, `Слов ${n} — это меньше 250, автоматический незачёт. Добавляй.`)
+      : n < 330 ? line(true, `Слов ${n} — проходит, но лучше довести до 330–380: будет запас.`)
+      : n <= 380 ? line(true, `Слов ${n} — объём идеальный.`)
+      : line(true, `Слов ${n} — больше 380, следи, чтобы не появилась вода.`);
+    h += paras === 4 ? line(true, 'Абзацев ровно 4 — так и нужно: тезис, два аргумента, вывод.')
+      : line(false, `Абзацев ${paras}. Нужно 4. Разделяй части пустой строкой.`);
+    h += sd >= 3 ? line(true, `Ритм живой (разброс ${sd.toFixed(1)}): предложения разной длины.`)
+      : line(false, `Разброс длины всего ${sd.toFixed(1)} — текст звучит ровно и машинно. Сделай часть фраз по 3–5 слов, часть по 25–30.`);
+    if (shortN < 3) h += line(false, `Коротких фраз мало (${shortN}). Добавь рубленые: «Бела погибает.» «Провожать его некому.»`);
+    if (longN === 0) h += line(false, 'Нет ни одного длинного предложения (25+ слов) — ритм получается плоским.');
+    h += found.length ? line(false, 'Слова-маркеры: ' + found.map((x) => '«' + x + '»').join(', ') + '. Замени или убери.')
+      : line(true, 'Слов-маркеров не найдено.');
+    h += typo.length ? line(false, 'Оформление: ' + typo.join(', ') + '.') : line(true, 'Оформление чистое.');
+    if (first && first === first.toLowerCase() && /[а-яё]/.test(first)) h += line(false, 'Текст начинается со строчной буквы.');
+    const ex = ['Печорин','Соколов','Матрён','Раскольников','Базаров','Обломов','Гринёв','Чацкий','Катерина','Онегин'];
+    const heroes = ex.filter((x) => t.includes(x));
+    h += heroes.length >= 2 ? line(true, 'В тексте есть конкретные герои: ' + heroes.join(', ') + '.')
+      : line(false, 'Мало конкретных имён. Судя по тексту, героев почти нет — а по критерию 2 нужен конкретный эпизод с именами.');
+    h += /(таким образом|подводя итог|в заключение|играет важную роль)/i.test(t) ? line(false, 'Есть связки-автоматы («таким образом», «в заключение») — не больше одной на текст.') : line(true, 'Связок-автоматов нет.');
+    res.innerHTML = h;
+  };
+  ta.addEventListener('input', analyze);
+  ta.value = (App.S.notes['ru:essay'] && App.S.notes['ru:essay'].text) || '';
+  analyze();
+  let saveT = null;
+  ta.addEventListener('input', () => { clearTimeout(saveT); saveT = setTimeout(() => record('note', { key: 'ru:essay', text: ta.value, title: 'Черновик сочинения' }), 1500); });
+}
+
 // ---------- разбор номера на части: теория, типы, ловушки ----------
 function parseDoc(html) {
   const tmp = document.createElement('div'); tmp.innerHTML = html;
@@ -339,6 +406,8 @@ export async function renderNumber(App_, n, tab, arg) {
       `</div>`));
   }
   art.querySelectorAll('[data-go]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); art.querySelector('#th-' + a.dataset.go)?.scrollIntoView({ behavior: 'smooth' }); }));
+  const ec = art.querySelector('.essay-check');
+  if (ec) mountEssayCheck(ec);
   drawFigs(art, figs);
   for (const ex of b.examples) { const hostEx = art.querySelector(`[data-example="${CSS.escape(ex.id)}"]`); if (hostEx) stand(hostEx, ex, figs, n.id); }
   art.querySelectorAll('.mathd').forEach((m, k) => {
