@@ -237,6 +237,27 @@ export function statusOf(n) {
 }
 
 // ---------- предмет ----------
+const RU_GROUPS = [
+  ['Начать с нуля', [1, 12]],
+  ['Писать сочинение', [2, 3]],
+  ['Темы: что могут спросить', [4, 5, 6]],
+  ['Аргументы: что учить', [7, 8, 9, 10, 11]],
+];
+/** Русский — свой раздел: короткая главная, содержание под кнопкой, всё свёрнуто по умолчанию */
+function ruSubjectView(nums, hero) {
+  const byNum = {}; nums.forEach((n) => (byNum[n.num] = n));
+  const row = (n) => n ? `<a class="ru-row" href="${numLink(n)}"><span class="ru-n">${n.num}</span><span class="ru-t"><b>${esc(n.title)}</b><span class="ru-a">${esc(n.about || '')}</span></span><span class="ru-m">~${n.minutes} мин</span></a>` : '';
+  const groups = RU_GROUPS.map(([title, list]) => `<details class="ru-group"><summary><b>${esc(title)}</b><span class="muted ui">${list.length}</span></summary><div class="ru-list">${list.map((k) => row(byNum[k])).join('')}</div></details>`).join('');
+  const quick = [1, 7, 4].map((k) => byNum[k]).filter(Boolean).map((n) => `<a href="${numLink(n)}"><b>${esc(n.title)}</b><span>${esc(n.about || '')}</span></a>`).join('');
+  return h(`<div class="page" data-title="Русский">
+    <div class="sub-hero"><div><p class="eyebrow">${esc(hero.eyebrow)}</p><h1>${esc(hero.name)}</h1>
+      <p class="lead">${esc(hero.lead)}</p>
+      <p class="muted ui">Экзамен 2 декабря 2026 · 3 часа 55 минут · минимум 250 слов, лучше 350</p></div></div>
+    <section class="card"><h3>С чего начать</h3><div class="ru-quick">${quick}</div></section>
+    <details class="ru-index"><summary><b>Содержание курса</b><span class="muted ui">${nums.length} разделов</span></summary><div class="ru-groups">${groups}</div></details>
+  </div>`);
+}
+
 function subjectView(subject) {
   const nums = App.catalog.filter((n) => n.subject === subject);
   const card = (n) => { const st = statusOf(n); return `<a class="num ${st === 'done' ? 'done' : st === 'work' ? 'work' : ''} ${n.hasContent ? '' : 'soon'}" href="${numLink(n)}">
@@ -249,6 +270,7 @@ function subjectView(subject) {
     : subject === 'математика'
       ? { eyebrow: 'ЕГЭ-2027 · профиль', name: 'Математика', lead: '20 заданий, 33 первичных балла, 235 минут.' }
       : { eyebrow: 'ЕГЭ-2027', name: 'Физика', lead: '26 заданий, 45 первичных баллов, 235 минут.' };
+  if (subject === 'русский') return ruSubjectView(nums, hero);
   return h(`<div class="page" data-title="${subject}"><div class="sub-hero"><div><p class="eyebrow">${hero.eyebrow}</p><h1>${hero.name}</h1>
     <p class="lead">${hero.lead} Разборов готово: ${ready} из ${nums.length}.</p>
     <div class="legend ui"><span><i class="done"></i>освоено ${cnt.done}</span><span><i class="work"></i>в работе ${cnt.work}</span><span><i class="new"></i>не начато ${cnt.new}</span></div></div>

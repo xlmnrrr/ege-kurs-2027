@@ -256,3 +256,31 @@ details.crit table { margin-top: var(--s2); }
 .th-body{padding:6px 0 22px}
 .doc.theory .toc a{display:block;padding:4px 0}
 
+
+/* Русский: короткая главная, содержание под кнопкой, всё свёрнуто */
+.ru-quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:10px}
+.ru-quick a{display:block;padding:14px 16px;border:1px solid rgba(255,255,255,.10);border-radius:12px;text-decoration:none;color:inherit;transition:border-color .15s}
+.ru-quick a:hover{border-color:rgba(233,176,98,.55)}
+.ru-quick b{display:block;margin-bottom:5px;font-size:15px}
+.ru-quick span{font-size:13px;opacity:.68;line-height:1.45}
+.ru-index{margin:16px 0 0}
+.ru-index>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:12px;padding:15px 18px;border:1px solid rgba(255,255,255,.12);border-radius:12px}
+.ru-index>summary::-webkit-details-marker{display:none}
+.ru-index>summary:hover{border-color:rgba(233,176,98,.45)}
+.ru-index>summary::after{content:'\25BE';margin-left:auto;opacity:.5;transition:transform .18s}
+.ru-index[open]>summary::after{transform:rotate(180deg)}
+.ru-groups{padding:12px 0 0}
+.ru-group{margin-bottom:8px;border:1px solid rgba(255,255,255,.08);border-radius:12px}
+.ru-group>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;padding:13px 15px}
+.ru-group>summary::-webkit-details-marker{display:none}
+.ru-group>summary::after{content:'\25BE';margin-left:auto;opacity:.4;transition:transform .18s}
+.ru-group[open]>summary::after{transform:rotate(180deg)}
+.ru-list{padding:0 10px 10px}
+.ru-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;text-decoration:none;color:inherit}
+.ru-row:hover{background:rgba(255,255,255,.05)}
+.ru-n{width:26px;text-align:center;font-weight:700;opacity:.75;flex:none}
+.ru-t{flex:1;min-width:0}
+.ru-t b{display:block;font-size:15px}
+.ru-a{display:block;font-size:13px;opacity:.6;line-height:1.4;margin-top:2px}
+.ru-m{font-size:12px;opacity:.5;white-space:nowrap;flex:none}
+

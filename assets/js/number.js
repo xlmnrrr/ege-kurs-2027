@@ -274,7 +274,7 @@ export async function renderNumber(App_, n, tab, arg) {
     ${doc.formulas ? `<details class="formulas-box" ${tab === 'шпаргалка' ? 'open' : ''}><summary class="ui">Формулы номера</summary><div class="formulas">${doc.formulas}</div></details>` : ''}
     <nav class="toc no-print">${fold ? '<b class="toc-h">Содержание</b>' : ''}${doc.theory.map((s, k) => `<a href="#" data-go="${k}">${esc(s.title)}</a>`).join('')}</nav>
     ${doc.theory.map((s, k) => fold
-      ? `<details class="th-sec th-fold" id="th-${k}" ${k === 0 ? 'open' : ''}><summary><h3>${esc(s.title)}</h3></summary><div class="th-body">${s.html}</div></details>`
+      ? `<details class="th-sec th-fold" id="th-${k}"><summary><h3>${esc(s.title)}</h3></summary><div class="th-body">${s.html}</div></details>`
       : `<section class="th-sec" id="th-${k}"><h3>${esc(s.title)}</h3>${s.html}</section>`).join('')}
     ${tab === 'шпаргалка' ? doc.types.map((t) => `<section class="th-sec"><h3>Тип ${t.id.slice(1)}. ${esc(t.title)}</h3>${t.html}</section>`).join('') : ''}
     ${doc.tail.join('')}</article>`);
