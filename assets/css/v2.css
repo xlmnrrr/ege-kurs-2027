@@ -284,3 +284,30 @@ details.crit table { margin-top: var(--s2); }
 .ru-a{display:block;font-size:13px;opacity:.6;line-height:1.4;margin-top:2px}
 .ru-m{font-size:12px;opacity:.5;white-space:nowrap;flex:none}
 
+
+/* Русский: материалы разбиты на подписанные блоки, чтобы не было сплошного текста */
+.arg-card{border:1px solid rgba(233,176,98,.30);background:rgba(233,176,98,.07);border-radius:12px;padding:14px 16px;margin:12px 0}
+.arg-card>p{margin:0 0 10px;line-height:1.6}
+.arg-card>p:last-child{margin-bottom:0}
+.arg-card strong{color:#E9B062}
+.arg-card>p:first-child strong{font-size:13px;letter-spacing:.04em;text-transform:uppercase;opacity:.85}
+.doc.theory aside{margin:12px 0}
+.doc.theory .criteria{margin:12px 0}
+.doc.theory>p{margin:10px 0}
+.doc.theory hr{margin:22px 0}
+/* Яндекс.Картинки: блок «Краткое содержание» длинный — даём ему воздух */
+.doc.theory aside.hint p{line-height:1.68}
+@media (max-width:520px){
+  .arg-card{padding:12px 13px;border-radius:10px;margin:10px 0}
+  .arg-card>p{margin-bottom:9px;font-size:15px}
+  .doc.theory aside,.doc.theory .criteria{padding:11px 12px}
+  .doc.theory aside.hint p{line-height:1.62}
+}
+
+
+/* Шеврон в свёртках: рисуем рамкой, символ в шрифте может не найтись */
+.th-sec.th-fold>summary::after,.ru-index>summary::after,.ru-group>summary::after{content:'';width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);opacity:.5;margin-left:auto;flex:none;transition:transform .18s ease;font-size:0}
+.th-sec.th-fold[open]>summary::after{transform:rotate(-135deg);opacity:.8}
+.ru-index[open]>summary::after{transform:rotate(-135deg);opacity:.8}
+.ru-group[open]>summary::after{transform:rotate(-135deg);opacity:.8}
+
