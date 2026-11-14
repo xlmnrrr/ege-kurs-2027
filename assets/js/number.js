@@ -72,6 +72,8 @@ export function normalize(s) { return String(s ?? '').trim().replace(/\s+/g, '')
 export function checkAnswer(given, task) {
   const g = normalize(given), a = normalize(task.a);
   if (!g) return null;
+  if (task.atype === 'набор') return [...g].sort().join('') === [...a].sort().join('');   // цифры без порядка (физика №5, 9, 14, 18, 20)
+  if (Array.isArray(task.alts) && task.alts.some((v) => normalize(v) === g)) return true;   // допустимые варианты записи
   const num = (x) => (/^-?\d+(,\d+)?$/.test(x) ? parseFloat(x.replace(',', '.')) : NaN);
   if (task.tol) { const [c, d] = normalize(task.tol).split('±').map(num); const x = num(g); return !Number.isNaN(x) && Math.abs(x - c) <= d + 1e-12; }
   const x = num(g), y = num(a);
@@ -84,6 +86,49 @@ export function checkAnswer(given, task) {
   return g === a;
 }
 
+
+/** Русский, страница аргументов: внутри каждого произведения блоки сворачиваются (по умолчанию закрыты),
+ *  состояние хранится в журнале событий ('fold') и синхронизируется. Опознаём блоки по их виду, ничего в разметке менять не надо. */
+const SUB_RULES = [
+  ['Краткое содержание', (e) => e.matches('aside.hint') && /^Краткое содержание/.test(e.textContent.trim())],
+  ['Герои', (e) => e.matches('.ru-heroes')],
+  ['Мелкие зацепки', (e) => e.matches('.ru-hooks')],
+  ['Что нельзя переврать', (e) => e.matches('aside.trap')],
+  ['Сцены-якоря', (e) => e.matches('p') && /^Сцены-якоря/.test(e.textContent.trim())],
+  ['Цитаты', (e) => e.matches('p') && /^Цитаты/.test(e.textContent.trim())],
+  ['Аргументы', (e) => e.matches('p') && /^Аргументы/.test(e.textContent.trim())],
+  ['Темы', (e) => e.matches('.criteria') && /Под какие темы/.test(e.textContent)],
+];
+function foldSubs(art, nid) {
+  const saved = (App.S && App.S.fold) || {};
+  art.querySelectorAll('details.th-fold > .th-body').forEach((bd) => {
+    const kids = [...bd.children].filter((el) => !el.classList.contains('ru-read'));
+    if (!kids.some((el) => SUB_RULES[0][1](el))) return; // не страница произведения
+    const work = bd.parentElement.querySelector('summary h3').textContent.trim();
+    const groups = []; let cur = null;
+    for (const el of kids) {
+      const rule = SUB_RULES.find((r) => r[1](el));
+      if (rule) { cur = { t: rule[0], els: [el] }; groups.push(cur); } else if (cur) cur.els.push(el);
+    }
+    for (const g of groups) {
+      const key = `${nid}|${work}|${g.t}`;
+      const d = document.createElement('details');
+      d.className = 'ru-sub'; d.dataset.sub = g.t; d.open = !!saved[key];
+      const cnt = g.t === 'Аргументы' ? g.els.filter((x) => x.classList.contains('arg-card')).length
+        : (g.t === 'Герои' || g.t === 'Мелкие зацепки') ? g.els[0].querySelectorAll('li').length : 0;
+      d.innerHTML = `<summary class="ui"><span>${g.t}</span>${cnt ? `<span class="ru-sub-n">${cnt}</span>` : ''}</summary><div class="ru-sub-body"></div>`;
+      g.els[0].before(d);
+      const inner = d.querySelector('.ru-sub-body');
+      g.els.forEach((x) => inner.appendChild(x));
+      let last = d.open; // событие пишем только при настоящей смене состояния, не при первой отрисовке
+      d.addEventListener('toggle', () => { if (d.open === last) return; last = d.open; record('fold', { key, open: d.open }); });
+    }
+  });
+  // при печати всё разворачивается, после печати возвращается как было
+  let was = null;
+  window.addEventListener('beforeprint', () => { was = [...art.querySelectorAll('details')].map((x) => [x, x.open]); art.querySelectorAll('details').forEach((x) => (x.open = true)); });
+  window.addEventListener('afterprint', () => { if (was) was.forEach(([x, o]) => (x.open = o)); was = null; });
+}
 
 /** Проверка сочинения: живые цифры по тексту, который ученик вставил сам (русский) */
 const AI_MARKERS = ['играет ключевую роль','играет важную роль','выступает символом','подчеркивает важность','подчёркивает важность','в современном мире','важно отметить','важно подчеркнуть','стоит подчеркнуть','необходимо учитывать','следует отметить','данный','является','осуществляется','представляет собой','более того','кроме того','таким образом','подводя итог','в заключение','многогранный','углубляться','гобелен','дотошный','знаковый','парадигма','релевантный','концептуальный','символизирует','олицетворяет','резюмируя'];
@@ -151,6 +196,34 @@ function mountEssayCheck(host) {
   ta.addEventListener('input', () => { clearTimeout(saveT); saveT = setTimeout(() => record('note', { key: 'ru:essay', text: ta.value, title: 'Черновик сочинения' }), 1500); });
 }
 
+// основы слов заголовка — чтобы связать тип задач с разделами теории
+const stems = (s) => String(s).toLowerCase().replace(/ё/g, 'е').match(/[а-я]{4,}/g)?.map((w) => w.slice(0, 6)).filter((w) => !['задачи', 'задача', 'тип', 'общего', 'через', 'найти'].includes(w)) || [];
+
+/** Тип задач базы-2027 (b1, b2, …): подбираем к нему теорию и разбор типа из номер.md по общим словам заголовков. */
+function baseType(b, doc, id) {
+  const bt = (b.btypes || []).find((x) => x.id === id);
+  if (!bt) return null;
+  const ts = new Set(stems(bt.title));
+  const tys = doc.types.filter((s) => stems(s.title).some((w) => ts.has(w)));
+  const th = doc.theory.filter((s) => stems(s.title).some((w) => ts.has(w)) || tys.some((t) => t.theory.includes(s)));
+  return { id: bt.id, title: bt.title, base: true, html: tys.map((x) => `<h3>${esc(x.title)}</h3>${x.html}`).join(''), theory: th };
+}
+
+/** «Решение» задачи базы: формулы → идея → свёрнутые способы по сложности → скрытый ответ → проверка. */
+function solutionV2(task, hasTraps) {
+  const solve = task.methods.filter((m) => m.kind === 'solve'), chk = task.methods.filter((m) => m.kind === 'check');
+  const meth = (m, label, open) => `<details class="method"${open ? ' open' : ''}><summary class="ui"><b>${label}</b> ${esc(m.title)}</summary>
+    <ol class="msteps">${m.steps.map((s) => `<li>${s}</li>`).join('')}</ol>${m.forms.length ? `<p class="mforms ui"><span class="muted">Формулы:</span> ${m.forms.join(' <span class="muted">·</span> ')}</p>` : ''}${m.a ? `<p class="ma ui"><span class="muted">Итог:</span> ${m.a}</p>` : ''}</details>`;
+  return `<div class="key sol2">
+    ${task.forms.length ? `<section><h5>Формулы</h5><ul class="flist">${task.forms.map((f) => `<li><span class="f">${f.f}</span>${f.why ? `<span class="why"> — ${f.why}</span>` : ''}</li>`).join('')}</ul></section>` : ''}
+    ${task.idea ? `<section><h5>Идея</h5>${task.idea}</section>` : ''}
+    <section><h5>${solve.length > 1 ? 'Способы решения — от простого к сложному' : 'Решение'}</h5>${solve.map((m, i) => meth(m, solve.length > 1 ? `Способ ${i + 1}.` : 'По шагам.', solve.length === 1)).join('')}</section>
+    <section><details class="ans"><summary class="ui"><b>Ответ</b> <span class="muted">— открыть</span></summary><p class="anst ui"><b>${task.self ? task.a : esc(task.a)}</b></p></details></section>
+    ${chk.length || task.check ? `<section><h5>Проверка</h5>${chk.map((m) => meth(m, 'Проверка.', false)).join('')}${task.check ? `<p class="chk ui muted">Как проверено: ${task.check}</p>` : ''}${hasTraps ? '<p class="ui"><button type="button" class="btn small quiet" data-traps>Ловушки этого номера</button></p>' : ''}</section>` : ''}
+    ${task.crit ? `<details class="crit"><summary class="ui">Критерии ФИПИ: как оценят это решение (макс. ${task.max || 2} б.)</summary>${task.crit}</details>` : ''}
+  </div>`;
+}
+
 // ---------- разбор номера на части: теория, типы, ловушки ----------
 function parseDoc(html) {
   const tmp = document.createElement('div'); tmp.innerHTML = html;
@@ -176,7 +249,6 @@ function parseDoc(html) {
     const d = document.createElement('div'); d.innerHTML = t.html;
     const how = [...d.querySelectorAll('p')].find((p) => /^Как узнать/.test(p.textContent));
     t.what = how ? how.textContent.replace(/^Как узнать:\s*/, '').split(/[;.]/)[0] : '';
-    const stems = (s) => s.toLowerCase().replace(/ё/g, 'е').match(/[а-я]{4,}/g)?.map((w) => w.slice(0, 6)).filter((w) => !['задачи', 'тип', 'общего'].includes(w)) || [];
     const ts = new Set(stems(t.title));
     t.theory = out.theory.filter((s) => stems(s.title).some((w) => ts.has(w)));
   }
@@ -366,11 +438,12 @@ export async function renderNumber(App_, n, tab, arg) {
     ${doc.tail.join('')}</article>`);
   body.appendChild(art);
   if (fold) { // русский читают блоками: оглавление, счётчик разделов и кнопки развернуть/свернуть
+    foldSubs(art, n.id);
     const bar = h(`<div class="row no-print fold-bar"><span class="muted ui">Разделов: ${fold ? real.length : doc.theory.length}</span><button class="btn small" data-unfold>Развернуть все</button><button class="btn small" data-fold>Свернуть все</button></div>`);
     if (all) bar.appendChild(h(`<a class="btn primary" href="${base}/задачи">Задания: ${done} из ${all}</a>`));
     body.prepend(bar);
-    bar.querySelector('[data-unfold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = true));
-    bar.querySelector('[data-fold]').onclick = () => art.querySelectorAll('details.th-fold').forEach((d) => (d.open = false));
+    bar.querySelector('[data-unfold]').onclick = () => art.querySelectorAll('details.th-fold, details.ru-sub').forEach((d) => (d.open = true));
+    bar.querySelector('[data-fold]').onclick = () => art.querySelectorAll('details.th-fold, details.ru-sub').forEach((d) => (d.open = false));
     // журнал чтения: «Читаю» -> «Прочитано», списки над разделами
     const boxes = [...art.querySelectorAll('.ru-read')];
     const st = (key) => (App.S.read && App.S.read[key] ? App.S.read[key].status : null);

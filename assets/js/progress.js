@@ -6,7 +6,7 @@ export const dayKey = (t) => { const d = new Date(t); return `${d.getFullYear()}
 export const startOfDay = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
 export function fold(events) {
-  const s = { tasks: {}, numbers: {}, notes: {}, marks: {}, formulas: {}, read: {}, days: {}, mocks: [], diag: {}, settings: {}, xp: 0 };
+  const s = { tasks: {}, numbers: {}, notes: {}, marks: {}, formulas: {}, read: {}, fold: {}, days: {}, mocks: [], diag: {}, settings: {}, xp: 0 };
   const sorted = [...events].sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
   for (const e of sorted) {
     const d = e.data || {};
@@ -36,6 +36,8 @@ export function fold(events) {
       case 'formula': if (d.on) s.formulas[d.key] = { t: e.t, tex: d.tex, title: d.title }; else delete s.formulas[d.key]; break;
       // чтение (русский): status = 'reading' (читаю) или 'done' (прочитано); last write wins
       case 'read': if (d.status) s.read[d.key] = { status: d.status, t: e.t, title: d.title, num: d.num }; else delete s.read[d.key]; break;
+      // свёрнутые блоки произведений (русский): key -> открыт ли; last write wins, синхронизируется как все события
+      case 'fold': s.fold[d.key] = !!d.open; break;
       case 'day': (s.days[d.date] ||= { minutes: 0, tasks: 0 }).minutes += d.minutes || 0; break;
       case 'mock': s.mocks.push({ ...d, t: e.t }); break;
       case 'setting': s.settings[d.key] = d.value; break;
