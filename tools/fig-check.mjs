@@ -1,5 +1,5 @@
 // Снимок всех рисунков номера по всем шагам (как на iPhone): node tools/fig-check.mjs математика/03 [файл.png] [начало имени, напр. задачаM01T6]
-// Нужен сервер с корнем проекта на 8111: node tools/dev-server.mjs "D:\road\курс егэ физика математика" 8111
+// Нужен сервер с корнем проекта на 8111: node tools/dev-server.mjs "D:\road\HARNESS + CLAUDE.br/ПРОЕКТЫ/курс егэ физика математика" 8111
 import { launch, sleep } from './cdp.mjs';
 const [n, out = `fig-${n.replace(/\W+/g, '-')}.png`, only = ''] = process.argv.slice(2);
 const b = await launch(); const p = await b.tab();

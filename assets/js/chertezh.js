@@ -246,7 +246,7 @@ export class Chertezh {
         let da = a1 - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
         const p1 = [O[0] + r * Math.cos(a0), O[1] + r * Math.sin(a0)], p2 = [O[0] + r * Math.cos(a0 + da), O[1] + r * Math.sin(a0 + da)];
         n.setAttribute('d', `M${p1} A${r},${r} 0 0 ${da > 0 ? 1 : 0} ${p2}`);
-        if (it.opt.name) { const am = a0 + da / 2; this._label(it, 1, [O[0] + (r + 14) * Math.cos(am), O[1] + (r + 14) * Math.sin(am)], it.opt.name, null, true); }
+        if (it.opt.name) { const am = a0 + da / 2, nr = it.opt.nameR || r + 14; this._label(it, 1, [O[0] + nr * Math.cos(am), O[1] + nr * Math.sin(am)], it.opt.name, null, true); }
       }
       n.setAttribute('class', cls('ch-angle')); n.style.setProperty('--len', (r * 3 * this.k).toFixed(1) + 'px');
     } else if (it.kind === 'ticks') {

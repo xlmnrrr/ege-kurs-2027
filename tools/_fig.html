@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Фигуры — просмотр</title>
+<link rel="stylesheet" href="../assets/css/tokens.css"><link rel="stylesheet" href="../assets/css/base.css"><link rel="stylesheet" href="../assets/css/chertezh.css">
+<style>
+ body{padding:10px;background:var(--bg)}
+ .grid{display:grid;gap:8px}
+ .cell{background:var(--surface);border-radius:10px;padding:6px}
+ .cell h4{font:600 12px/1.3 var(--font-ui);margin:0 0 4px;color:var(--muted)}
+ .cell svg{background:var(--surface2);border-radius:8px;display:block;width:100%;height:auto}
+ .err{color:var(--err);font:12px var(--font-ui)}
+</style></head><body>
+<div class="grid" id="g"></div>
+<script type="module">
+import { Chertezh, mid, lerp, V } from '../assets/js/chertezh.js';
+const qs = new URLSearchParams(location.search), n = qs.get('n'), f = qs.get('f') || '', step = qs.get('step');
+document.querySelector('.grid').style.gridTemplateColumns = 'repeat(' + (qs.get('cols') || 2) + ',1fr)';
+const g = document.getElementById('g'), errs = [];
+try {
+  const mod = await import(`../../контент/${n}/рисунки.js?${Date.now()}`);
+  const names = Object.keys(mod).filter((k) => typeof mod[k] === 'function' && k.startsWith(f));
+  for (const name of names) {
+    const cell = document.createElement('div'); cell.className = 'cell';
+    cell.innerHTML = `<h4>${name}</h4><svg></svg>`; g.appendChild(cell);
+    try { const ch = new Chertezh(cell.querySelector('svg'), { mode: '2d' }); mod[name](ch, { mid, lerp, V });
+      const last = ch.steps - 1; ch.render(); ch.setStep(step == null ? last : +step, true); }
+    catch (e) { errs.push(name + ': ' + e.message); cell.insertAdjacentHTML('beforeend', `<p class="err">${e.message}</p>`); }
+  }
+} catch (e) { errs.push(e.message); }
+window.__errs = errs; document.body.dataset.ready = '1';
+</script></body></html>

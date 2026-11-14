@@ -19,8 +19,15 @@
 .ch .ch-pt { fill: var(--ink); stroke: var(--bg, #1C222E); stroke-width: 1.5; }
 .ch .ch-pt-hid { fill: var(--faint); }
 .ch .ch-pt.accent { fill: var(--c-acc); }
-.ch .ch-angle { stroke: var(--c-acc); stroke-width: 1.8; fill: none; }
-.ch .ch-tick { stroke: var(--c-acc); stroke-width: 2; }
+/* обозначения — как в КИМ: дуги углов и засечки того же цвета, что линии;
+   цветом выделяем только то, о чём спрашивают (класс accent/accent2 на элементе) */
+.ch .ch-angle { stroke: var(--ink); stroke-width: 1.5; fill: none; }
+.ch .ch-angle.thin { stroke-width: 1.1; }
+.ch .ch-angle.accent { stroke: var(--c-acc); stroke-width: 2.4; }
+.ch .ch-angle.accent2 { stroke: var(--c-acc2); stroke-width: 2.4; }
+.ch .ch-tick { stroke: var(--ink); stroke-width: 1.7; }
+.ch .ch-tick.accent { stroke: var(--c-acc); stroke-width: 2.2; }
+.ch .ch-tick.accent2 { stroke: var(--c-acc2); stroke-width: 2.2; }
 .ch .ch-vec { stroke-width: 3; stroke: var(--ink); }
 .ch .ch-head { fill: var(--ink); stroke: none; }
 .ch .v-vel, .ch .ch-head.v-vel { stroke: var(--c-acc); fill: var(--c-acc); }
