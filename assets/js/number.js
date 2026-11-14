@@ -101,33 +101,49 @@ const SUB_RULES = [
 ];
 function foldSubs(art, nid) {
   const saved = (App.S && App.S.fold) || {};
+  const builders = [];
+  // Содержимое произведения собирается в блоки только при первом раскрытии (ленивая отрисовка: на телефоне 39 произведений = десятки тысяч узлов).
   art.querySelectorAll('details.th-fold > .th-body').forEach((bd) => {
     const kids = [...bd.children].filter((el) => !el.classList.contains('ru-read'));
     if (!kids.some((el) => SUB_RULES[0][1](el))) return; // не страница произведения
-    const work = bd.parentElement.querySelector('summary h3').textContent.trim();
-    const groups = []; let cur = null;
-    for (const el of kids) {
-      const rule = SUB_RULES.find((r) => r[1](el));
-      if (rule) { cur = { t: rule[0], els: [el] }; groups.push(cur); } else if (cur) cur.els.push(el);
-    }
-    for (const g of groups) {
-      const key = `${nid}|${work}|${g.t}`;
-      const d = document.createElement('details');
-      d.className = 'ru-sub'; d.dataset.sub = g.t; d.open = !!saved[key];
-      const cnt = g.t === 'Аргументы' ? g.els.filter((x) => x.classList.contains('arg-card')).length
-        : (g.t === 'Герои' || g.t === 'Мелкие зацепки') ? g.els[0].querySelectorAll('li').length : 0;
-      d.innerHTML = `<summary class="ui"><span>${g.t}</span>${cnt ? `<span class="ru-sub-n">${cnt}</span>` : ''}</summary><div class="ru-sub-body"></div>`;
-      g.els[0].before(d);
-      const inner = d.querySelector('.ru-sub-body');
-      g.els.forEach((x) => inner.appendChild(x));
-      let last = d.open; // событие пишем только при настоящей смене состояния, не при первой отрисовке
-      d.addEventListener('toggle', () => { if (d.open === last) return; last = d.open; record('fold', { key, open: d.open }); });
-    }
+    const holder = bd.parentElement, work = holder.querySelector('summary h3').textContent.trim();
+    const anchor = bd.querySelector('.ru-read'); // кнопки «Читаю / Прочитано» остаются на месте
+    const frag = document.createDocumentFragment();
+    kids.forEach((el) => frag.appendChild(el));
+    let built = false;
+    const build = () => {
+      if (built) return; built = true;
+      const parts = [...frag.children]; const groups = []; let cur = null; const loose = [];
+      for (const el of parts) {
+        const rule = SUB_RULES.find((r) => r[1](el));
+        if (rule) { cur = { t: rule[0], els: [el] }; groups.push(cur); } else if (cur) cur.els.push(el); else loose.push(el);
+      }
+      const out = document.createDocumentFragment();
+      loose.forEach((el) => out.appendChild(el));
+      for (const g of groups) {
+        const key = `${nid}|${work}|${g.t}`;
+        const d = document.createElement('details');
+        d.className = 'ru-sub'; d.dataset.sub = g.t; d.open = !!saved[key];
+        const cnt = g.t === 'Аргументы' ? g.els.filter((x) => x.classList.contains('arg-card')).length
+          : (g.t === 'Герои' || g.t === 'Мелкие зацепки') ? g.els[0].querySelectorAll('li').length : 0;
+        d.innerHTML = `<summary class="ui"><span>${g.t}</span>${cnt ? `<span class="ru-sub-n">${cnt}</span>` : ''}</summary><div class="ru-sub-body"></div>`;
+        const inner = d.querySelector('.ru-sub-body');
+        g.els.forEach((x) => inner.appendChild(x));
+        let last = d.open; // событие пишем только при настоящей смене состояния, не при первой отрисовке
+        d.addEventListener('toggle', () => { if (d.open === last) return; last = d.open; record('fold', { key, open: d.open }); });
+        out.appendChild(d);
+      }
+      bd.insertBefore(out, anchor || null);
+    };
+    builders.push(build);
+    holder.addEventListener('toggle', () => { if (holder.open) build(); });
+    if (holder.open) build();
   });
-  // при печати всё разворачивается, после печати возвращается как было
+  // при печати всё разворачивается (блоки строятся сразу), после печати возвращается как было
   let was = null;
-  window.addEventListener('beforeprint', () => { was = [...art.querySelectorAll('details')].map((x) => [x, x.open]); art.querySelectorAll('details').forEach((x) => (x.open = true)); });
+  window.addEventListener('beforeprint', () => { builders.forEach((b) => b()); was = [...art.querySelectorAll('details')].map((x) => [x, x.open]); art.querySelectorAll('details').forEach((x) => (x.open = true)); });
   window.addEventListener('afterprint', () => { if (was) was.forEach(([x, o]) => (x.open = o)); was = null; });
+  art.__buildAll = () => builders.forEach((b) => b());
 }
 
 /** Проверка сочинения: живые цифры по тексту, который ученик вставил сам (русский) */
@@ -442,7 +458,7 @@ export async function renderNumber(App_, n, tab, arg) {
     const bar = h(`<div class="row no-print fold-bar"><span class="muted ui">Разделов: ${fold ? real.length : doc.theory.length}</span><button class="btn small" data-unfold>Развернуть все</button><button class="btn small" data-fold>Свернуть все</button></div>`);
     if (all) bar.appendChild(h(`<a class="btn primary" href="${base}/задачи">Задания: ${done} из ${all}</a>`));
     body.prepend(bar);
-    bar.querySelector('[data-unfold]').onclick = () => art.querySelectorAll('details.th-fold, details.ru-sub').forEach((d) => (d.open = true));
+    bar.querySelector('[data-unfold]').onclick = () => { art.querySelectorAll('details.th-fold').forEach((d) => (d.open = true)); art.__buildAll && art.__buildAll(); art.querySelectorAll('details.ru-sub').forEach((d) => (d.open = true)); };
     bar.querySelector('[data-fold]').onclick = () => art.querySelectorAll('details.th-fold, details.ru-sub').forEach((d) => (d.open = false));
     // журнал чтения: «Читаю» -> «Прочитано», списки над разделами
     const boxes = [...art.querySelectorAll('.ru-read')];
