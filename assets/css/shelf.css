@@ -99,9 +99,16 @@
 
 /* мини-страница предмета в книге и слой полёта: она растёт из книги до экрана и становится настоящей страницей */
 .book-page.has-pv { padding: 0; overflow: hidden; background: var(--bg); }
-.book-page.has-pv > span { display: none; }
+.book-page.has-pv > .bp-t, .book-page.has-pv > .bp-s { display: none; }
 .pv { position: absolute; top: 0; left: 0; overflow: hidden; transform-origin: 0 0; background: var(--bg); pointer-events: none; color: var(--text); font: var(--fs-text)/var(--lh-text) var(--font-text); text-align: left; }
 .pv .top { position: relative; }
+/* половина мини-сайта на листе книги (левая — на внутренней стороне обложки, правая — на странице) */
+.book-half { position: absolute; inset: 0; overflow: hidden; background: var(--bg); border-radius: inherit; }
+.bc-back .book-half { border-radius: 6px 0 0 6px; }
+.book-page .book-half { border-radius: 0 6px 6px 0; }
+.book-half::after { content: ""; position: absolute; top: 0; bottom: 0; width: 10%; pointer-events: none; }
+.bc-back .book-half::after { right: 0; background: linear-gradient(270deg, color-mix(in srgb, var(--shade) 30%, transparent), transparent); }
+.book-page .book-half::after { left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--shade) 30%, transparent), transparent); }
 .fly { position: fixed; inset: 0; z-index: 100; pointer-events: none; overflow: hidden; background: var(--bg); }
 
 /* приземление в предмет: блоки встают из «страницы» каскадом */

@@ -117,42 +117,57 @@ function flyInto(a, screen, shelf, { preview, adopt }) {
   shelf.classList.add('choosing'); screen.classList.add('choosing');
   const cw = document.documentElement.clientWidth, vw = innerWidth, vh = innerHeight;
 
-  // мини-страница предмета — сразу в книге, под обложкой
-  const pv = preview?.(a.dataset.book);
-  if (pv) {
-    pv.classList.add('pv'); pv.style.width = `${cw}px`; pv.style.height = `${vh}px`;
-    page.classList.add('has-pv'); page.appendChild(pv);
-    pv.style.transform = `scale(${page.clientWidth / cw})`;
+  // внутри книги сразу сайт: левая половина мини-страницы — на внутренней стороне обложки, правая — на странице.
+  // Когда обложка легла, разворот = мини-страница целиком (по ширине, без обрезки), никаких подмен и проявлений.
+  const pvR = preview?.(a.dataset.book), pvL = preview?.(a.dataset.book);
+  const Wl = body.clientWidth, kpv = (2 * Wl) / cw;
+  const half = (pvEl, host, shift) => {
+    const box = document.createElement('span'); box.className = 'book-half'; box.setAttribute('aria-hidden', 'true');
+    pvEl.classList.add('pv'); pvEl.style.width = `${cw}px`; pvEl.style.height = `${vh}px`; pvEl.style.transform = `translate(${shift}px, 0px) scale(${kpv})`;
+    box.appendChild(pvEl); host.appendChild(box); return box;
+  };
+  let boxR = null;
+  if (pvR && pvL) {
+    page.classList.add('has-pv');
+    boxR = half(pvR, page, -Wl);
+    half(pvL, cover.querySelector('.bc-back'), 0);
   }
-
   // A. книга выплывает в центр: корешок — по центру экрана, раскрытая книга помещается целиком
   const br = a.getBoundingClientRect(), W = br.width, H = body.offsetHeight;
-  const s = Math.max(1, Math.min((vh * 0.6) / H, (vw * 0.44) / W, 2.6));
-  const dx = vw / 2 + (W * s) / 2 - (br.left + W / 2), dy = vh * 0.48 - (br.top + H / 2);
+  // раскрытый разворот (обложка + страница = 2W·s): крупно, но с воздухом вокруг
+  const s = Math.max(1, Math.min((vh * 0.78) / H, (vw * 0.86) / (2 * W)));
+  const dx = vw / 2 + (W * s) / 2 - (br.left + W / 2), dy = vh * 0.5 - (br.top + H / 2);
   const ease = 'cubic-bezier(.22,.8,.2,1)';
   // точка схода — туда, где книга окажется, иначе раскрытая обложка уйдёт в перекос
-  a.animate([{ perspectiveOrigin: '50% 50%' }, { perspectiveOrigin: `${(dx + W / 2).toFixed(1)}px ${(dy + H / 2).toFixed(1)}px` }], { duration: 600, easing: ease, fill: 'forwards' });
-  body.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${s})` }], { duration: 600, easing: ease, fill: 'forwards' });
+  a.animate([{ perspectiveOrigin: '50% 50%' }, { perspectiveOrigin: `${(dx + W / 2).toFixed(1)}px ${(dy + H / 2).toFixed(1)}px` }], { duration: 700, easing: ease, fill: 'forwards' });
+  // без остановки: к 0,7 с книга в центре, дальше продолжает медленно наплывать — нырок в страницу подхватывает это движение
+  const cur = getComputedStyle(body).transform;
+  body.animate([
+    { transform: cur === 'none' ? 'none' : cur, offset: 0, easing: 'cubic-bezier(.25,.75,.35,1)' },
+    { transform: `translate(${dx}px, ${dy}px) scale(${s})`, offset: 0.44, easing: 'cubic-bezier(.4,0,.7,.4)' },
+    { transform: `translate(${dx}px, ${dy}px) scale(${s * 1.1})`, offset: 1 },
+  ], { duration: 1600, fill: 'forwards' });
   // B. обложка раскрывается по корешку
-  cover.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(-170deg)' }], { duration: 700, delay: 280, easing: 'cubic-bezier(.3,.7,.15,1)', fill: 'forwards' });
+  cover.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(-180deg)' }], { duration: 640, delay: 200, easing: 'cubic-bezier(.3,.6,.25,1)', fill: 'forwards' });
 
   // C. страница растягивается до экрана: слой полёта забирает мини-страницу и растит её из книги
   let fly = null;
-  at(1000, () => {
-    const r = page.getBoundingClientRect();
+  at(860, () => {
+    // разворот на экране: правая половина — страница, левая — такая же ширина слева от корешка
+    const rr = (boxR || page).getBoundingClientRect(), left = rr.left - rr.width, r = { left, top: rr.top, right: rr.right, bottom: rr.bottom, width: rr.width * 2 };
     fly = document.createElement('div');
     fly.className = 'fly'; fly.setAttribute('aria-hidden', 'true');
     document.body.appendChild(fly);
     const k = r.width / cw, rad = (6 * s).toFixed(1);
     const clip0 = `inset(${r.top.toFixed(1)}px ${(vw - r.right).toFixed(1)}px ${(vh - r.bottom).toFixed(1)}px ${r.left.toFixed(1)}px round ${rad}px)`;
-    const curve = 'cubic-bezier(.65,0,.2,1)', dur = 760;
+    const curve = 'cubic-bezier(.32,.2,.2,1)', dur = 760;   // старт не с нуля — продолжение наплыва книги
     fly.animate([{ clipPath: clip0 }, { clipPath: 'inset(0px 0px 0px 0px round 0px)' }], { duration: dur, easing: curve, fill: 'forwards' });
-    if (pv) {
-      fly.appendChild(pv);
-      pv.animate([{ transform: `translate(${r.left}px, ${r.top}px) scale(${k})` }, { transform: 'translate(0px, 0px) scale(1)' }], { duration: dur, easing: curve, fill: 'forwards' });
+    if (pvR) {
+      fly.appendChild(pvR);
+      pvR.style.transform = ''; pvR.animate([{ transform: `translate(${r.left}px, ${r.top}px) scale(${k})` }, { transform: 'translate(0px, 0px) scale(1)' }], { duration: dur, easing: curve, fill: 'forwards' });
     }
     // книга под слоем уходит в глубину — как будто камера пролетает сквозь неё
-    body.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${s})`, opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(${s * 1.5})`, opacity: 0 }], { duration: dur, easing: curve, fill: 'forwards' });
+    body.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur, easing: 'ease-in', fill: 'forwards', composite: 'replace' });
   });
 
   // D. переход: страница из слоя становится настоящей
@@ -162,7 +177,7 @@ function flyInto(a, screen, shelf, { preview, adopt }) {
     timers.forEach(clearTimeout);
     removeEventListener('keydown', onKey, true); removeEventListener('pointerdown', onSkip, true);
     document.documentElement.dataset.arrive = a.dataset.book;
-    const pg = fly && pv?.querySelector('.page');
+    const pg = fly && pvR?.querySelector('.page');
     const adopted = !!(pg && fly.contains(pg));
     let shown = false;
     const reveal = () => {
@@ -179,7 +194,7 @@ function flyInto(a, screen, shelf, { preview, adopt }) {
     if (adopted) adopt?.(href, pg);
     location.hash = href;
   };
-  at(1800, go);
+  at(1640, go);
   // пропустить полёт: любой клик или Esc/Enter/пробел
   const onSkip = (e) => { e.preventDefault(); go(); };
   const onKey = (e) => { if (['Escape', 'Enter', ' '].includes(e.key)) { e.preventDefault(); go(); } };

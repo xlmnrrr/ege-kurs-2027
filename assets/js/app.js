@@ -19,6 +19,21 @@ export const SUBJ = { м: 'математика', ф: 'физика', р: 'ру�
 export const SUBJ_LIST = ['математика', 'физика', 'русский'];
 export const SUBJ_LABEL = { математика: 'Математика · профиль', физика: 'Физика', русский: 'Русский · итоговое сочинение' };
 export const SUBJ_SHORT = { математика: 'Математика', физика: 'Физика', русский: 'Русский' };
+// Адреса: внутри — прежние кириллические ключи (#/м/3/теория), в строке браузера — латиница (#/math/3/theory).
+// Старые ссылки и закладки продолжают работать: маршрутизатор понимает оба вида.
+const LAT = { м: 'math', ф: 'phys', р: 'ru', тип: 'type', теория: 'theory', ловушки: 'traps', шпаргалка: 'sheet', проверка: 'check', задачи: 'tasks',
+  заметки: 'notes', формулы: 'formulas', настройки: 'settings', повтор: 'review', диагностика: 'diag', план: 'plan',
+  алгебра: 'algebra', геометрия: 'geometry', физика: 'physics' };
+const CYR = Object.fromEntries(Object.entries(LAT).map(([k, v]) => [v, k]));
+/** Части адреса во внутреннем (кириллическом) виде — независимо от того, как он записан */
+export function hashParts(h = location.hash) { return decodeURIComponent(String(h).replace(/^#\/?/, '')).split('/').filter(Boolean).map((t) => CYR[t] || t); }
+const hashKey = (h) => '#/' + hashParts(h).join('/');
+/** Переписать адрес в строке на латиницу, не создавая записи в истории и не вызывая hashchange */
+function latinize() {
+  const parts = hashParts(); if (!parts.length) return;
+  const lat = '#/' + parts.map((t) => LAT[t] || t).join('/');
+  if (decodeURIComponent(location.hash) !== lat) history.replaceState(history.state, '', lat);
+}
 export const numLink = (n) => `#/${LETTER[n.subject]}/${n.num}`;
 const ICON = {
   today: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -116,7 +131,7 @@ async function enter() {
   }, true);
   document.addEventListener('click', (e) => { const c = e.target.closest('[data-close-book]'); if (!c || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); closeBook(c.closest('[data-book]')?.dataset.book); });
   // пришёл прогресс с другого устройства — перерисовать обзорные страницы (не трогаем номер, чтобы не сбить решение)
-  addEventListener('ege-synced', () => { if (document.querySelector('.shelf.choosing')) return; /* книга летит — не перерисовывать */ const hsh = location.hash.replace(/^#\/?/, ''); if (!hsh || /^(м|ф|р|заметки|повтор)\/?$/.test(decodeURIComponent(hsh))) route({ quiet: true }); });
+  addEventListener('ege-synced', () => { if (document.querySelector('.shelf.choosing')) return; /* книга летит — не перерисовывать */ const hsh = hashParts().join('/'); if (!hsh || /^(м|ф|р|заметки|повтор)$/.test(hsh)) route({ quiet: true }); });
   route();
   // день занятий: минуты считаем по активному времени на странице
   let last = Date.now(), acc = 0;
@@ -150,14 +165,14 @@ export function setSyncDot(state = dotState) { dotState = state; document.queryS
 // ---------- маршруты ----------
 async function route(opts) {
   const quiet = opts?.quiet === true, keepY = quiet ? scrollY : 0; // тихая перерисовка (пришёл прогресс): без каскада и без прыжка наверх
-  const parts = decodeURIComponent(location.hash.replace(/^#\/?/, '')).split('/').filter(Boolean);
+  const parts = hashParts(); latinize();
   const main = $('#main');
   document.querySelectorAll('.nav a').forEach((a) => a.toggleAttribute('aria-current', false));
   const cur = '#/' + (parts[0] || '');
   const navA = [...document.querySelectorAll('.nav a')].find((a) => a.getAttribute('href') === cur);
   if (navA) navA.setAttribute('aria-current', 'page');
   let view;
-  const adopted = App.adopt && decodeURIComponent(location.hash) === App.adopt.hash ? App.adopt.node : null; App.adopt = null;
+  const adopted = App.adopt && hashKey(location.hash) === hashKey(App.adopt.hash) ? App.adopt.node : null; App.adopt = null;
   try {
     if (adopted) view = adopted; // страница прилетела из книги — уже готова
     else if (!parts.length) view = await home();
@@ -572,7 +587,7 @@ async function boot() {
     let reloading = false; const hadController = !!navigator.serviceWorker.controller;   // первая установка — не перезагружать
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (reloading || !hadController) return;
-      if (/\/(тип|проверка)/.test(decodeURIComponent(location.hash))) { toast('Курс обновлён — новая версия откроется при переходе', 5000); return; }
+      if (/(^|\/)(тип|проверка)(\/|$)/.test(hashParts().join('/'))) { toast('Курс обновлён — новая версия откроется при переходе', 5000); return; }
       reloading = true; location.reload();
     });
   }
