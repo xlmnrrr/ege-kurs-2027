@@ -38,12 +38,12 @@ ok(streak(fold(days), t0 + 8 * D) === 0, 'пропуск учебного дня
 
 // --- шкалы ---
 ok(testScore('физика', 40) === 90 && testScore('физика', 45) === 100, 'физика: 40 → 90, 45 → 100');
-ok(testScore('математика', 33) === 100 && testScore('математика', 0) === 0, 'математика 2027: 33 → 100');
+ok(testScore('математика', 32) === 100 && testScore('математика', 0) === 0 && testScore('математика', 16) === 78, 'математика 2027 (итоговая демоверсия): шкала 2026, 32 → 100, 16 → 78');
 ok(Math.abs(testScore('математика', 22.7) - 90) <= 1, 'математика: 22,7 первичных 2027 ≈ 90 (прогноз по шкале 2026)');
 ok(level(0).lv === 1 && level(200).lv === 3, 'уровни растут по опыту');
 
 // --- план ---
-const catalog = JSON.parse(readFileSync(new URL('../../контент/номера.json', import.meta.url), 'utf8'));
+const catalog = JSON.parse(readFileSync(new URL('../../контент/номера.json', import.meta.url), 'utf8')).filter((n) => !n.archived); // как на сайте: архивные номера не собираются
 const empty = fold([]);
 const plan = buildPlan(empty, catalog, { now: t0, days: 14 });
 ok(plan.length === 14, 'план на 14 дней');
@@ -51,7 +51,7 @@ ok(plan.filter((d) => d.kind === 'rest').length === 2, 'два воскресе�
 ok(plan.filter((d) => d.kind === 'mock').length === 2, 'пробник раз в неделю (сб)');
 const study = plan.filter((d) => d.kind === 'study');
 ok(study.every((d) => d.blocks.reduce((a, b) => a + b.minutes, 0) === 120), 'учебный день = 120 минут (20 + 70 + 30)');
-ok(new Set(study.map((d) => d.subject)).size === 2, 'чередуются оба предмета');
+{ const ss = new Set(study.map((d) => d.subject)); ok(ss.has('математика') && ss.has('физика'), 'в плане чередуются математика и физика (русский — свои дни до сочинения)'); }
 ok(study[0].blocks[1].num && /0[1-4]$/.test(study[0].blocks[1].num), `первый номер — из части 1 с высокой отдачей (${study[0].blocks[1].num})`);
 const later = buildPlan(empty, catalog, { now: t0 + 2 * D, days: 3 });
 ok(later[0].date === '2026-11-11', 'пропустил дни — план начинается с сегодняшнего дня (пересборка)');
@@ -60,7 +60,7 @@ ok(exam[0].kind === 'exam' && exam[0].subject === 'математика' && exam
 const f = feasibility(empty, catalog, { now: t0 });
 ok(f['математика'].ok && f['физика'].ok, `времени хватает: математика нужно ${f['математика'].need} из ${f['математика'].have}, физика ${f['физика'].need} из ${f['физика'].have} блоков`);
 const fc = forecast(empty, catalog);
-ok(fc['математика'].max === 33 && fc['физика'].max === 45, 'максимумы первичных 33 и 45');
+ok(fc['математика'].max === 32 && fc['физика'].max === 45, 'максимумы первичных 32 и 45');
 
 { // сброс прогресса: предмет и всё
   const E = (t, type, data) => ({ id: type + t, t, type, data });

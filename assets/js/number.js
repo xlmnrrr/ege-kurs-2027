@@ -7,12 +7,51 @@ import { Chertezh, mid, lerp, V } from './chertezh.js';
 import { dueReviews } from './progress.js';
 import { sound, speak } from './extras.js';
 import { mountBoard } from './board.js';
+import { sceneForText, standKeys, scene3dHTML, mountScene3d, SCENE_NAMES } from './scene3d.js';
 
 // Подписи и буквы предметов в одном месте: раньше здесь было жёстко «математика или физика»
 const SUBJ_NAME = { математика: 'Математика', физика: 'Физика', русский: 'Русский' };
 const SUBJ_LET = { математика: 'м', физика: 'ф', русский: 'р' };
 const subjName = (n) => SUBJ_NAME[n.subject] || n.subject;
 const subjLet = (n) => SUBJ_LET[n.subject] || 'м';
+const SUBJ_KEY = { математика: 'm', физика: 'f', русский: 'r' };
+const UP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+/** Шапка главы: объёмная цифра номера (наклоняется за курсором), название, состав, «решено X из Y» */
+function chapterHead(n, prog) {
+  const ru = n.subject === 'русский';
+  const part = ru ? 'Русский, раздел' : `${subjName(n)}, часть ${n.part === 1 ? 'I' : 'II'}`;
+  const meta = [n.points ? `${n.points} ${n.points === 1 ? 'балл' : n.points < 5 ? 'балла' : 'баллов'}` : '', ru ? (n.about || '') : '', n.minutes ? (ru ? '~' : 'на экзамене ~') + n.minutes + ' мин' : '', n.pct2026 ? `в 2026 решили ${Math.round(n.pct2026)} %` : ''].filter(Boolean).map(esc).join(', ');
+  return `<header class="ch-hero">
+    <a class="ch-up" href="#/${subjLet(n)}" data-ch-up="${esc(n.id)}">${UP_ICON}<span>Оглавление</span></a>
+    <div class="ch-main">
+      <span class="ch-num" aria-hidden="true"><span>${n.num}</span></span>
+      <div class="ch-tt">
+        <p class="ch-part">${esc(part)}</p>
+        <h1><span class="sr">№${n.num}. </span>${esc(n.title)}</h1>
+        ${meta ? `<p class="ch-meta">${meta}</p>` : ''}
+        ${prog && prog.all ? `<div class="ch-prog"><span class="ch-bar"><i style="--p:${(prog.done / prog.all).toFixed(3)}"></i></span><span>решено ${prog.done} из ${prog.all}</span></div>` : ''}
+      </div>
+    </div>
+  </header>`;
+}
+/** Наклон цифры главы за курсором (только мышь, без «уменьшить движение») */
+function tiltChapter(v) {
+  const hero = v.querySelector('.ch-hero'), num = v.querySelector('.ch-num');
+  if (!hero || !num || matchMedia('(prefers-reduced-motion: reduce)').matches || !matchMedia('(hover: hover)').matches) return;
+  hero.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const r = num.getBoundingClientRect(), px = (e.clientX - (r.left + r.width / 2)) / innerWidth, py = (e.clientY - (r.top + r.height / 2)) / innerHeight;
+    num.style.setProperty('--ry', `${(px * 26).toFixed(2)}deg`); num.style.setProperty('--rx', `${(-py * 18).toFixed(2)}deg`);
+  }, { passive: true });
+  hero.addEventListener('pointerleave', () => { num.style.removeProperty('--ry'); num.style.removeProperty('--rx'); });
+}
+/** Соседние номера внизу главы: перелистывание */
+function chapterPager(n) {
+  const list = App.catalog.filter((x) => x.subject === n.subject).sort((a, b) => a.num - b.num);
+  const i = list.findIndex((x) => x.id === n.id), prev = list[i - 1], next = list[i + 1];
+  const a = (x, dir) => `<a class="ch-turn ${dir}" href="${numLink(x)}" data-turn="${dir}"><small>${dir === 'prev' ? '‹ предыдущий' : 'следующий ›'}</small><b>№${x.num}. ${esc(x.title)}</b></a>`;
+  return `<nav class="ch-pager no-print" aria-label="Соседние номера">${prev ? a(prev, 'prev') : '<span></span>'}${next ? a(next, 'next') : '<span></span>'}</nav>`;
+}
 
 const figMods = {};
 async function figuresOf(b) { // код рисунков номера: расшифрованный текст -> модуль через Blob URL
@@ -290,6 +329,7 @@ function taskCard(task, numId, figs, opt = {}) {
   const n = App.catalog.find((x) => x.id === numId);
   const srcTxt = task.src ? `${esc(task.src.вид || '')}${task.src.где ? ': ' + esc(task.src.где) : ''}` : '';
   const LV = ['', 'база', 'средний', 'трудный'];
+  const s3d = n ? sceneForText(n.subject, task.q) : null; // тело или сцена из условия — для кнопки «3D-модель»
   const el = h(`<article class="task" aria-label="Задача ${esc(task.id)}">
     <div class="task-meta"><span class="chip">${n ? `${subjName(n)} №${n.num}` : ''} · тип ${esc(task.type.replace(/^t/, ''))}</span><span class="chip lv${task.level}">${LV[task.level] || ''}</span>
       <button class="btn quiet small" data-say>Вслух</button></div>
@@ -297,7 +337,8 @@ function taskCard(task, numId, figs, opt = {}) {
     ${task.fig && figs[task.fig] ? '<figure class="fig"><svg role="img" aria-label="Рисунок к задаче"></svg></figure>' : ''}
     ${Array.isArray(task.choices) && task.choices.length ? `<div class="choices">${task.choices.map((c, i) => `<button type="button" class="choice" data-v="${i + 1}"><b>${i + 1}</b><span>${c}</span></button>`).join('')}</div>` : ''}
     <form class="answer${Array.isArray(task.choices) && task.choices.length ? ' answer-hidden' : ''}" autocomplete="off"><label class="sr" for="a-${esc(task.id)}">Ответ</label><input class="input" id="a-${esc(task.id)}" inputmode="decimal" placeholder="Ответ"><button class="btn primary" type="submit">Проверить</button></form>
-    <div class="tools"><button class="btn" data-hint>Подсказка</button>${opt.onTheory ? '<button class="btn" data-theory>Теория</button>' : ''}${opt.onFormulas ? '<button class="btn" data-formulas>Формулы</button>' : ''}<button class="btn quiet" data-sol>Решение</button></div>
+    <div class="m3d-wrap" hidden></div>
+    <div class="tools"><button class="btn" data-hint>Подсказка</button>${s3d ? `<button class="btn" data-3d aria-expanded="false">3D-модель</button>` : ''}${opt.onTheory ? '<button class="btn" data-theory>Теория</button>' : ''}${opt.onFormulas ? '<button class="btn" data-formulas>Формулы</button>' : ''}<button class="btn quiet" data-sol>Решение</button></div>
     <div class="res" aria-live="polite"></div><div class="hints"></div>
     ${srcTxt ? `<p class="src">Источник: ${srcTxt}</p>` : ''}</article>`);
   if (task.fig && figs[task.fig]) { const ch = makeFigure(figs[task.fig], el.querySelector('figure svg')); ch.setStep(0, true); }
@@ -313,6 +354,8 @@ function taskCard(task, numId, figs, opt = {}) {
   if (opt.onTheory) el.querySelector('[data-theory]').onclick = opt.onTheory;
   if (opt.onFormulas) el.querySelector('[data-formulas]').onclick = opt.onFormulas;
   el.querySelector('[data-say]').onclick = () => speak(task.say);
+  const b3 = el.querySelector('[data-3d]');
+  if (b3) b3.onclick = () => { const w = el.querySelector('.m3d-wrap'); if (!w.firstChild) { w.innerHTML = scene3dHTML(s3d); } const on = w.hidden; w.hidden = !on; b3.setAttribute('aria-expanded', on); b3.textContent = on ? 'Скрыть 3D' : '3D-модель'; if (on) mountScene3d(w.querySelector('.s3d')); };
   async function finish(ok) {
     if (done) return; done = true;
     el.querySelector('[data-hint]').disabled = true; el.querySelector('[data-sol]').disabled = true; input.disabled = true; el.querySelector('form button').disabled = true;
@@ -395,11 +438,11 @@ export async function renderNumber(App_, n, tab, arg) {
   const ru = n.subject === 'русский';
   if (tab === 'разбор') tab = 'задачи';            // старые ссылки
   if (!tab) tab = ru ? 'теория' : 'задачи';        // у русского по умолчанию чтение, у остальных задачи
-  const head = `<div class="num-head"><p class="ui muted" style="margin:0 0 6px"><a href="#/${subjLet(n)}">${subjName(n)}</a> · ${ru ? 'раздел ' + n.num : 'задание ' + n.num + ' · ' + (n.part === 1 ? 'часть 1' : 'часть 2')}</p>
-    <h1>№${n.num}. ${esc(n.title)}</h1><p class="lead">${n.points ? `${n.points} ${n.points === 1 ? 'балл' : n.points < 5 ? 'балла' : 'баллов'} · ` : ''}${ru ? esc(n.about || '') + ' · ~' + n.minutes + ' мин' : 'на экзамене ~' + n.minutes + ' мин'}${n.pct2026 ? ` · в 2026 решили ${Math.round(n.pct2026)} %` : ''}</p></div>`;
-  if (!n.hasContent) return h(`<div class="page" data-title="№${n.num} ${esc(n.title)}">${head}<div class="card"><h3>Разбор готовится</h3><p>Этот номер ещё собирается из всех книг КАГ и банка ФИПИ. План занятий учитывает его — когда разбор появится, он откроется здесь.</p><p><a class="btn" href="#/${subjLet(n)}">К списку номеров</a></p></div></div>`);
+  const head = chapterHead(n);
+  const pageCls = `page ch ch-${SUBJ_KEY[n.subject] || 'm'}`;
+  if (!n.hasContent) return h(`<div class="${pageCls}" data-title="№${n.num} ${esc(n.title)}">${head}<div class="card"><h3>Разбор готовится</h3><p>Этот номер ещё собирается из всех книг КАГ и банка ФИПИ. План занятий учитывает его — когда разбор появится, он откроется здесь.</p><p><a class="btn" href="#/${subjLet(n)}">К списку номеров</a></p></div></div>`);
   const b = await loadBundle(n.id), figs = await figuresOf(b), doc = parseDoc(b.html);
-  const v = h(`<div class="page" data-title="№${n.num} ${esc(n.title)}"></div>`);
+  const v = h(`<div class="${pageCls}" data-title="№${n.num} ${esc(n.title)}"></div>`);
   const solved = (list) => list.filter((t) => App.S.tasks[t.id]?.last?.ok).length;
 
   if (tab === 'тип' || tab === 'проверка') {
@@ -411,10 +454,11 @@ export async function renderNumber(App_, n, tab, arg) {
   }
   const all = b.tasks.length, done = solved(b.tasks), p = all ? Math.round((done / all) * 100) : 0;
   const tabs = ru ? '' : `<nav class="tabs" aria-label="Разделы номера">${[['задачи', 'Задачи'], ['теория', 'Теория'], ['ловушки', 'Ловушки'], ['шпаргалка', 'Шпаргалка А4']].map(([k, t]) => `<a href="${base}${k === 'задачи' ? '' : '/' + k}" ${tab === k ? 'aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
-  v.innerHTML = `<div class="num-hero">${head}${(!ru || all) ? `<div class="ring" style="--p:${p}" aria-label="Освоено ${p} %"><span>${p}%<small>освоено</small></span></div>` : ''}</div>
-    <div class="row no-print"><button class="btn small" data-note>Заметка</button><button class="btn small" data-mark aria-pressed="${!!App.S.marks[n.id]}">${App.S.marks[n.id] ? 'В закладках' : 'В закладки'}</button>${ru ? `<span class="muted ui">${all ? `решено ${done} из ${all} · ` : ''}открывай разделы по одному — так читается легче</span>` : `<span class="muted ui">решено ${done} из ${all}</span>`}</div>
-    <div class="note-box"></div>${tabs}<div class="body"></div>`;
+  v.innerHTML = `${chapterHead(n, { done, all })}
+    <div class="row no-print"><button class="btn small" data-note>Заметка</button><button class="btn small" data-mark aria-pressed="${!!App.S.marks[n.id]}">${App.S.marks[n.id] ? 'В закладках' : 'В закладки'}</button>${ru ? `<span class="muted ui">${all ? `решено ${done} из ${all} · ` : ''}открывай разделы по одному — так читается легче</span>` : ''}</div>
+    <div class="note-box"></div>${tabs}<div class="body"></div>${ru ? '' : chapterPager(n)}`;
   const body = v.querySelector('.body');
+  tiltChapter(v);
   v.querySelector('[data-mark]').onclick = async (e) => { const on = !App.S.marks[n.id]; await record('mark', { key: n.id, on, title: `${subjName(n)} №${n.num}. ${n.title}` }); e.target.textContent = on ? 'В закладках' : 'В закладки'; e.target.setAttribute('aria-pressed', on); };
   v.querySelector('[data-note]').onclick = () => {
     const nb = v.querySelector('.note-box'); if (nb.firstChild) { nb.innerHTML = ''; return; }
@@ -427,9 +471,9 @@ export async function renderNumber(App_, n, tab, arg) {
   if (tab === 'задачи') {
     const known = b.tasks.filter((t) => t.known), prevK = App.S.numbers[b.id]?.known;
     body.innerHTML = `${known.length ? `<section class="check-card"><div><b>Проверить себя</b><p>${known.length} задач на самые трудные типы · ~10 минут.${prevK ? ` Прошлый результат: ${prevK.score} из ${prevK.total}.` : ' Всё верно — сразу к трудному уровню.'}</p></div><a class="btn primary" href="${base}/проверка">Начать</a></section>` : ''}
-      <h2>Типы задач</h2><div class="types">${doc.types.map((t) => { const list = b.tasks.filter((x) => x.type === t.id), d = solved(list);
-        return `<a class="type-card" href="${base}/тип/${t.id}"><div class="row1"><b><span class="n">${t.id.slice(1)}</span>${esc(t.title)}</b><span class="cnt">${d}/${list.length}</span></div>
-          <div class="what">${esc(t.what)}</div><div class="bar"><i style="width:${list.length ? (d / list.length) * 100 : 0}%"></i></div></a>`; }).join('')}</div>`;
+      <h2 class="ch-h">Типы задач</h2><div class="types">${doc.types.map((t) => { const list = b.tasks.filter((x) => x.type === t.id).sort((x, y) => x.level - y.level), d = solved(list);
+        return `<a class="type-card par" href="${base}/тип/${t.id}"><div class="row1"><b><span class="n">§ ${t.id.slice(1)}</span>${esc(t.title)}</b><span class="cnt">${d} из ${list.length}</span></div>
+          <div class="what">${esc(t.what)}</div><div class="par-ticks" aria-hidden="true">${list.map((x) => `<i class="lv${x.level}${App.S.tasks[x.id]?.last?.ok ? ' ok' : ''}"></i>`).join('')}</div></a>`; }).join('')}</div>`;
     return v;
   }
   if (tab === 'ловушки') { body.innerHTML = `<div class="doc">${doc.traps.join('') || '<p class="empty">Ловушек нет.</p>'}</div>`; return v; }
@@ -453,6 +497,12 @@ export async function renderNumber(App_, n, tab, arg) {
     ${tab === 'шпаргалка' ? doc.types.map((t) => `<section class="th-sec"><h3>Тип ${t.id.slice(1)}. ${esc(t.title)}</h3>${t.html}</section>`).join('') : ''}
     ${doc.tail.join('')}</article>`);
   body.appendChild(art);
+  const keys3d = tab === 'теория' ? standKeys(n.id) : [];
+  if (keys3d.length) {
+    const st = h(`<section class="stand3d no-print" aria-label="3D-стенд"><h3>3D-стенд</h3><div class="st-chips" role="group" aria-label="Модели">${keys3d.map((k, i) => `<button type="button" class="chip st-chip" data-k="${k}" aria-pressed="${i === 0}">${esc(SCENE_NAMES[k])}</button>`).join('')}</div><div class="st-host">${scene3dHTML(keys3d[0])}</div></section>`);
+    art.prepend(st);
+    st.querySelectorAll('[data-k]').forEach((b) => (b.onclick = () => { st.querySelectorAll('[data-k]').forEach((x) => x.setAttribute('aria-pressed', x === b)); const host = st.querySelector('.st-host'); host.innerHTML = scene3dHTML(b.dataset.k); mountScene3d(host.querySelector('.s3d')); }));
+  }
   if (fold) { // русский читают блоками: оглавление, счётчик разделов и кнопки развернуть/свернуть
     foldSubs(art, n.id);
     const bar = h(`<div class="row no-print fold-bar"><span class="muted ui">Разделов: ${fold ? real.length : doc.theory.length}</span><button class="btn small" data-unfold>Развернуть все</button><button class="btn small" data-fold>Свернуть все</button></div>`);

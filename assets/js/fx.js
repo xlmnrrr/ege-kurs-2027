@@ -1,7 +1,7 @@
 // Эффекты интерфейса (DESIGN.md, v3): появление блоков каскадом, досчёт чисел, свет лампы на карточке под курсором.
 // «Уменьшить движение» — ничего не двигается, числа сразу итоговые. Текст никогда не прячется надолго: анимация ≤ 0,45 с.
 const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-const BLOCKS = '.hero, .callout, .card, .pmap, .num, .type-card, .check-card, .task, .board, .ref-cards > a, .day, .list .item, .part-h, .num-hero, .sub-hero, .dt';
+const BLOCKS = '.hero, .callout, .card, .pmap, .num, .type-card, .check-card, .task, .board, .ref-cards > a, .day, .list .item, .part-h, .num-hero, .sub-hero, .dt, .sp-hero-t, .sp-model, .ct';
 
 /** Новый экран: блоки поднимаются по очереди, числа досчитываются */
 export function enter(view) {
@@ -30,7 +30,7 @@ function countUp(el) {
 }
 
 /** Свет на карточках: координаты курсора внутри карточки → CSS-переменные --mx/--my */
-const LIT = '.card, .num, .type-card, .callout, .check-card, .pmap, .ref-cards > a, .task, .nchip';
+const LIT = '.card, .num, .type-card, .callout, .check-card, .pmap, .ref-cards > a, .task, .nchip, .ct-row';
 export function initLight() {
   if (matchMedia('(hover: none)').matches) return;
   let cur = null, raf = 0, ev = null;

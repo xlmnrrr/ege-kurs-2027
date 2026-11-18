@@ -1,0 +1,136 @@
+/* hallmark: система закреплена в DESIGN.md («Вечерняя лампа») · экран: «Полка», стартовый экран после входа · signature: объёмные книги и «влёт в книгу» */
+/* critique: шапки на главной нет; книга — обычная ссылка; двигаются только transform/opacity (+clip-path у слоя полёта); reduce — без движения и сразу переход */
+
+.shelf-screen { --lx: .5; --ly: .3; min-height: 100svh; display: grid; align-content: center; justify-items: center; gap: 0;
+  max-width: var(--page); margin: 0 auto; padding: max(var(--s6), env(safe-area-inset-top)) var(--s4) var(--s6); box-sizing: border-box; }
+.shelf-head, .shelf-nav, .shelf-board { transition: opacity 420ms var(--ease), transform 420ms var(--ease); }
+.shelf-head { text-align: center; margin-bottom: clamp(var(--s6), 6vh, var(--s8)); min-width: 0; }
+.shelf-head h1 { margin: 0; font: 650 clamp(28px, 2vw + 18px, 42px)/var(--lh-head) var(--font-text); color: var(--text); overflow-wrap: break-word; }
+.shelf-head .lamp { display: inline-block; vertical-align: .32em; margin-right: 14px; }
+.shelf-lead { margin: var(--s3) 0 0; font: 400 16px/var(--lh-ui) var(--font-ui); color: var(--muted); }
+
+/* полка */
+.shelf { width: min(100%, 780px); display: flex; justify-content: center; align-items: flex-end; gap: clamp(14px, 3.4vw, 44px); padding: 0 clamp(0px, 2vw, 24px); box-sizing: border-box; position: relative; z-index: 2; }
+.shelf-board { width: min(100%, 860px); height: 14px; margin-top: -2px; border-radius: 3px; position: relative;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--line-strong) 60%, var(--line)), var(--surface2) 35%, var(--surface)); box-shadow: 0 22px 40px -14px var(--shade); }
+.shelf-board::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; opacity: .55;
+  background: radial-gradient(40% 100% at calc(var(--lx) * 100%) 0, var(--primary), transparent); }
+
+/* книга: объёмный блок — обложка, страницы, корешок, обрез, задняя крышка */
+.book { --accent: var(--primary); --cloth: color-mix(in srgb, var(--accent) 24%, var(--bg)); --thick: clamp(7px, 8cqi, 18px);
+  --rest: 0deg; --lift: 0px; --rx: 0deg; --ry: 0deg; --gx: 50%; --gy: 0%;
+  flex: 0 1 228px; min-width: 0; position: relative; display: block; color: var(--text); text-decoration: none;
+  container-type: inline-size; perspective: 1100px; -webkit-tap-highlight-color: transparent; transition: opacity 420ms var(--ease); }
+.book-m { --rest: 7deg; }
+.book-r { --accent: var(--peach); }
+.book-f { --accent: var(--blue); --rest: -7deg; }
+.book:focus-visible { outline: none; }
+.book:focus-visible .bc-front { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+.book-body { position: relative; display: block; aspect-ratio: 2 / 3; transform-style: preserve-3d;
+  transform: translateY(var(--lift)) rotateX(var(--rx)) rotateY(calc(var(--rest) + var(--ry)));
+  transition: transform 620ms cubic-bezier(.2, .8, .2, 1); }
+.book.tilting .book-body { transition-duration: 160ms; }
+.book-r .book-body { aspect-ratio: 2 / 2.8; }
+.book-f .book-body { aspect-ratio: 2 / 2.9; }
+
+.book-back { position: absolute; inset: 0; transform: translateZ(calc(var(--thick) * -1)); border-radius: 3px var(--r-field) var(--r-field) 3px;
+  background: color-mix(in srgb, var(--cloth) 70%, var(--shade)); }
+.book-spine { position: absolute; top: 0; bottom: 0; right: 100%; width: var(--thick); transform-origin: right center; transform: rotateY(-90deg);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cloth) 55%, var(--shade)), color-mix(in srgb, var(--cloth) 85%, var(--shade))); }
+.book-edge { position: absolute; top: 4px; bottom: 4px; left: calc(100% - 2px); width: calc(var(--thick) - 2px); transform-origin: left center; transform: rotateY(90deg);
+  background: repeating-linear-gradient(90deg, var(--paper) 0 1px, color-mix(in srgb, var(--paper) 72%, var(--shade)) 1px 2px); }
+
+/* первая страница под обложкой */
+.book-page { position: absolute; inset: 3px 1px 3px 3px; transform: translateZ(-1px); display: grid; align-content: center; justify-items: center; gap: 6px; padding: 12%;
+  border-radius: 2px var(--r-btn) var(--r-btn) 2px; color: var(--ink); text-align: center;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--shade) 22%, transparent), transparent 12%),
+    repeating-linear-gradient(180deg, transparent 0 17px, var(--paper-rule) 17px 18px), var(--paper); }
+.bp-t { font: 600 clamp(13px, 11cqi, 22px)/1.15 var(--font-text); overflow-wrap: anywhere; }
+.bp-s { font: 400 var(--fs-small)/1.3 var(--font-ui); opacity: .7; }
+
+/* обложка: лицо и оборот, поворот по корешку */
+.book-cover { position: absolute; inset: 0; transform-origin: left center; transform-style: preserve-3d; }
+.bc-front, .bc-back { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 3px var(--r-field) var(--r-field) 3px; }
+.bc-front { display: flex; flex-direction: column; padding: 14% 9% 10% 14%; box-sizing: border-box; overflow: hidden;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--shade) 45%, transparent) 0 6%, color-mix(in srgb, var(--text) 10%, transparent) 6% 6.8%, transparent 6.8%),
+    linear-gradient(calc(110deg + (var(--lx) - .5) * 70deg), color-mix(in srgb, var(--text) 9%, transparent), transparent 48%),
+    var(--cloth);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
+.bc-front::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 360ms var(--ease);
+  background: radial-gradient(70% 55% at var(--gx) var(--gy), color-mix(in srgb, var(--primary) 30%, transparent), transparent 72%); }
+.bc-back { transform: rotateY(180deg); background: linear-gradient(270deg, color-mix(in srgb, var(--shade) 30%, transparent), transparent 20%), color-mix(in srgb, var(--accent) 14%, var(--bg)); }
+
+.bc-em { width: 54%; height: auto; margin-bottom: auto; fill: none; stroke: color-mix(in srgb, var(--text) 62%, transparent); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.bc-em .ax { stroke: color-mix(in srgb, var(--text) 30%, transparent); }
+.bc-em .acc { stroke: var(--accent); }
+.bc-t { font: 600 clamp(13.5px, 11cqi, 26px)/1.1 var(--font-text); letter-spacing: -.005em; overflow-wrap: break-word; hyphens: none; min-width: 0; margin-top: var(--s3); }
+.bc-s { margin-top: 6px; font: 400 clamp(12px, 6.4cqi, 14px)/1.3 var(--font-ui); color: color-mix(in srgb, var(--text) 78%, transparent); }
+.bc-p { display: flex; align-items: center; gap: 8px; margin-top: 10%; font: 500 var(--fs-small)/1 var(--font-ui); color: color-mix(in srgb, var(--text) 70%, transparent); font-variant-numeric: tabular-nums; }
+.bc-p i { flex: 1; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--text) 16%, transparent); position: relative; overflow: hidden; }
+.bc-p i::before { content: ""; position: absolute; inset: 0; background: var(--accent); transform-origin: left; transform: scaleX(var(--p)); }
+
+/* тень книги на полке */
+.book-shade { position: absolute; left: 4%; right: 4%; bottom: -8px; height: 14px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--shade) 85%, transparent), transparent); transition: transform 620ms var(--ease), opacity 620ms var(--ease); }
+
+/* активная книга: наведение, фокус с клавиатуры, касание */
+@media (hover: hover) {
+  .book:hover { --lift: -14px; }
+  .book:hover .bc-front::after { opacity: 1; }
+  .book:hover .book-shade { transform: scaleX(.8); opacity: .5; }
+}
+.book:focus-visible, .book:active { --lift: -14px; }
+.book:focus-visible .bc-front::after, .book:active .bc-front::after { opacity: 1; }
+.book:focus-visible .book-shade, .book:active .book-shade { transform: scaleX(.8); opacity: .5; }
+
+/* выбор: остальное уходит в темноту, выбранная книга летит (траекторию задаёт shelf.js) */
+.shelf-screen.choosing .shelf-head { opacity: 0; transform: translateY(-14px); }
+.shelf-screen.choosing .shelf-nav, .shelf-screen.choosing .shelf-board { opacity: 0; transform: translateY(14px); }
+.shelf.choosing .book:not(.open) { opacity: 0; pointer-events: none; }
+.book.open { z-index: 3; }
+.book.open .book-shade { opacity: 0; }
+.book.open .bc-front::after { opacity: 1; }
+
+/* вернулись из предмета: книга встаёт на полку */
+.book.returning .book-body { animation: shelf-return 900ms cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes shelf-return { from { transform: translateY(-46px) rotateX(10deg) rotateY(calc(var(--rest) - 18deg)) scale(1.12); opacity: 0; } }
+
+/* мини-страница предмета в книге и слой полёта: она растёт из книги до экрана и становится настоящей страницей */
+.book-page.has-pv { padding: 0; overflow: hidden; background: var(--bg); }
+.book-page.has-pv > span { display: none; }
+.pv { position: absolute; top: 0; left: 0; overflow: hidden; transform-origin: 0 0; background: var(--bg); pointer-events: none; color: var(--text); font: var(--fs-text)/var(--lh-text) var(--font-text); text-align: left; }
+.pv .top { position: relative; }
+.fly { position: fixed; inset: 0; z-index: 100; pointer-events: none; overflow: hidden; background: var(--bg); }
+
+/* приземление в предмет: блоки встают из «страницы» каскадом */
+html[data-arrive] .fx-in { animation-name: arrive; animation-duration: .7s; animation-delay: calc(var(--i, 0) * 46ms + 120ms); }
+@keyframes arrive { from { opacity: 0; transform: perspective(900px) translateY(28px) rotateX(-12deg); } }
+
+/* разделы, которые были в шапке */
+.shelf-nav { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px 4px; margin-top: clamp(var(--s6), 5vh, var(--s7)); max-width: 940px; }
+.sn-link { min-height: var(--tap); display: inline-flex; align-items: center; padding: 0 12px; border: 0; border-radius: var(--r-btn); background: transparent; cursor: pointer;
+  font: 500 var(--fs-ui)/1 var(--font-ui); color: var(--muted); text-decoration: none; transition: color var(--t-fast), background-color var(--t-fast); }
+.sn-link:hover { color: var(--text); background: color-mix(in srgb, var(--surface) 80%, transparent); }
+.sn-tools { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; padding-left: 10px; border-left: 1px solid var(--line); }
+.sn-tools .sync-dot { margin-right: 6px; }
+.home-today { scroll-margin-top: var(--s4); }
+.home2 .dash-h1 { margin: 0 0 6px; font: 650 clamp(26px, 1.6vw + 16px, 34px)/var(--lh-head) var(--font-text); text-wrap: balance; letter-spacing: -.01em; }
+
+@media (max-width: 520px) {
+  .shelf-screen { padding-top: max(var(--s5), env(safe-area-inset-top)); }
+  .shelf-head { margin-bottom: var(--s6); }
+  .shelf { gap: 12px; padding: 0 4px; }
+  .book-m { --rest: 5deg; } .book-f { --rest: -5deg; }
+  .bc-front { padding: 14% 6% 10% 11%; }
+  .shelf-nav { gap: 0 2px; }
+  .sn-link { padding: 0 10px; }
+  .sn-tools { margin-left: 0; padding-left: 0; border-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book, .book:hover, .book:focus-visible, .book:active { --lift: 0px; --rx: 0deg; --ry: 0deg; }
+  .book.returning .book-body { animation: none; }
+}
+@media print { .shelf-screen { display: none; } .fly { display: none; } }

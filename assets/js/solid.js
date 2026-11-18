@@ -29,7 +29,7 @@ export function mountSolid(fig) {
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let bi = 0, yaw = 0.6, pitch = 0.42, vy = 0, sweep = still ? 0 : -1.2, raf = 0, last = 0, visible = true, drag = null, capText = '', capAt = 0, fade = 1, W = 0, H = 0, dpr = 1;
 
-  const size = () => { const r = canvas.getBoundingClientRect(); dpr = Math.min(devicePixelRatio || 1, 2); W = r.width; H = r.height; canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); };
+  const size = () => { /* размер раскладки, а не на экране: в книге холст уменьшен transform-ом */ dpr = Math.min(devicePixelRatio || 1, 2); W = canvas.clientWidth; H = canvas.clientHeight; canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); };
 
   function draw() {
     const b = BODIES[bi];

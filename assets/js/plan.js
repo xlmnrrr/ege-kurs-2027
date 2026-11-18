@@ -51,7 +51,7 @@ export function buildPlan(s, catalog, { now = Date.now(), days = 14, tasksById =
     const daysTo = (subj) => Math.round((parse(o.exams[subj]) - t) / DAY);
     // пробник раз в неделю (когда есть хотя бы половина номеров предмета)
     if (wd === o.mockDay) {
-      const subj = left('математика') / 20 <= left('физика') / 26 ? 'математика' : 'физика';
+      const subj = left('математика') / 19 <= left('физика') / 26 ? 'математика' : 'физика'; // 19 заданий математики (демоверсия 2027), 26 физики
       out.push({ date, kind: 'mock', subject: subj, blocks: [{ kind: 'mock', minutes: 235, subject: subj }] });
       continue;
     }

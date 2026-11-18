@@ -13,7 +13,7 @@ export async function renderDiag(App_, letter) {
     const done = (s) => App.catalog.filter((n) => n.subject === s && App.S.diag[n.id]).length;
     return h(`<div class="page prose" data-title="Диагностика"><h1>Диагностика</h1>
       <p class="lead">По 1–2 задачи на каждый номер ЕГЭ-2027, обе части. Итог покажет, с каких номеров начинать — план перестроится сам. Можно проходить частями: результат каждого номера сохраняется.</p>
-      <div class="nums">${[['м', 'математика', 20], ['ф', 'физика', 26]].map(([l, s, k]) => `<a class="num" href="#/диагностика/${l}"><span class="n">${s === 'математика' ? 'М' : 'Ф'}</span><span><span class="t">${s === 'математика' ? 'Математика · профиль' : 'Физика'}</span><br><span class="s">${k} номеров · ~${s === 'математика' ? 90 : 100} минут</span></span><span class="st">${done(s)} из ${k}</span></a>`).join('')}</div></div>`);
+      <div class="nums">${[['м', 'математика', 19], ['ф', 'физика', 26]].map(([l, s, k]) => `<a class="num" href="#/диагностика/${l}"><span class="n">${s === 'математика' ? 'М' : 'Ф'}</span><span><span class="t">${s === 'математика' ? 'Математика · профиль' : 'Физика'}</span><br><span class="s">${k} номеров · ~${s === 'математика' ? 90 : 100} минут</span></span><span class="st">${done(s)} из ${k}</span></a>`).join('')}</div></div>`);
   }
   const id = letter === 'м' ? 'dm' : 'df';
   let b;

@@ -272,7 +272,8 @@ export class Chertezh {
     // индексы: «M_1» -> M с нижним индексом
     if (n.dataset.s !== s) {
       n.textContent = '';
-      const m = /^(.+?)(?:_(.+))?$/.exec(s);
+      // пустая или многострочная подпись не должна ронять рисунок (18.11: №1 после пересборки)
+      const m = /^(.+?)(?:_(.+))?$/s.exec(String(s ?? '')) || [null, String(s ?? ''), null];
       n.appendChild(document.createTextNode(m[1]));
       if (m[2]) { const t = el('tspan', { 'baseline-shift': 'sub', class: 'ch-sub' }, n); t.textContent = m[2]; }
       n.dataset.s = s;

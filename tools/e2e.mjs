@@ -47,12 +47,9 @@ try {
   ok(!(await p.run(`!!document.querySelector('#pmap')`)), 'неверный пароль: курс не открылся');
   await login(p);
   ok(await p.until(`!!document.querySelector('#pmap')`, 10000), 'верный пароль: главная с картой номеров');
-  ok((await p.run(`document.querySelectorAll('#pmap .nchip').length`)) === 46, 'в карте номеров 46 номеров (20 + 26)');
-  // будни — 3 блока, суббота — пробник (1 блок), воскресенье — отдых (0)
-  const wd = await p.run(`new Date().getDay()`);
-  const tl = await p.run(`document.querySelectorAll('.timeline .tl').length`);
-  const expTl = wd === 6 ? 1 : wd === 0 ? 0 : 3;
-  ok(tl === expTl, `план на сегодня: ${tl} блок(ов), ожидалось ${expTl} (день недели ${wd})`);
+  // итоговая демоверсия 2027: математика 19 + физика 26 + русский 6 разделов (план дня с главной убран 10.11 — его проверок нет)
+  ok((await p.run(`document.querySelectorAll('#pmap .nchip').length`)) === 51, 'в карте номеров 51 (математика 19 + физика 26 + русский 6)');
+  ok(await p.run(`[...document.querySelectorAll('#pmap .nchip b')].filter((b) => b.closest('.pm-sub')?.querySelector('h3')?.textContent.startsWith('Математика')).map((b) => +b.textContent).sort((a, b) => a - b).join() === Array.from({ length: 19 }, (_, i) => i + 1).join()`), 'математика: номера 1–19 без пропусков и повторов');
   ok(await noHScroll(p), 'главная 393 px: без горизонтальной прокрутки');
   await shot(p, 'iphone-home');
   // запоминание устройства
@@ -120,10 +117,8 @@ try {
   // заметки
   await p.run(`location.hash='#/заметки'`); await p.until(`!!document.querySelector('h1')`, 5000); await sleep(300);
   ok(await p.run(`document.querySelectorAll('.list .item .mathd').length >= 1`), 'формула попала в «Мой лист формул»');
-  // план
-  await p.run(`location.hash='#/план'`); await p.until(`!!document.querySelector('.week')`, 5000);
-  ok(await p.run(`document.querySelectorAll('.week .day').length === 21`), 'план на 3 недели');
-  ok(await noHScroll(p), 'план 393 px: без горизонтальной прокрутки');
+  // план убран 10.11: старая ссылка ведёт на главную
+  await p.run(`location.hash='#/план'`); ok(await p.until(`!!document.querySelector('.shelf')`, 5000), 'старая ссылка #/план ведёт на главную');
   // калькулятор
   await p.run(`document.querySelector('[data-calc]').click()`); await sleep(200);
   for (const k of ['sin', '3', '0', ')', '×', '2', '=']) await p.run(`document.querySelector('.keys [data-k="${k}"]').click()`);

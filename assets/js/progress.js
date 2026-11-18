@@ -89,12 +89,12 @@ export function mastery(s, catalogNum, tasksOfNum = []) {
   return Math.min(1, m);
 }
 
-// Шкалы 2026 (исследование\шкалы.md); математика 2027 — прогноз: p * 32/33 по таблице 2026
+// Шкалы 2026 (исследование\шкалы.md). Математика 2027 по итоговой демоверсии — снова 19 заданий и 32 балла: шкала 2026 без пересчёта
 const SCALE_M = [0, 6, 11, 17, 22, 27, 34, 40, 46, 52, 58, 64, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 95, 96, 97, 98, 99, 100, 100, 100];
 const SCALE_F = [0, 5, 9, 14, 18, 23, 27, 32, 36, 39, 41, 43, 44, 46, 48, 49, 51, 53, 54, 56, 58, 59, 61, 62, 64, 65, 67, 68, 70, 71, 73, 74, 76, 77, 79, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100];
 export function testScore(subject, primary) {
   if (subject === 'физика') return SCALE_F[Math.max(0, Math.min(45, Math.round(primary)))];
-  const p = Math.max(0, Math.min(32, (primary * 32) / 33)), lo = Math.floor(p), hi = Math.min(32, lo + 1);
+  const p = Math.max(0, Math.min(32, primary)), lo = Math.floor(p), hi = Math.min(32, lo + 1);
   return Math.round(SCALE_M[lo] + (SCALE_M[hi] - SCALE_M[lo]) * (p - lo));
 }
 /** Прогноз: первичный = Σ баллов номера × освоение; затем шкала */

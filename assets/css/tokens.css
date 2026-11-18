@@ -12,6 +12,8 @@
   --tint-peach: color-mix(in srgb, var(--peach) 12%, var(--surface));
   --tint-ok: color-mix(in srgb, var(--ok) 12%, var(--surface));
   --tint-err: color-mix(in srgb, var(--err) 12%, var(--surface));
+  /* полка на главной (18.11): тень, бумага первой страницы, чернила */
+  --shade: #0B0E14; --paper: color-mix(in srgb, var(--text) 88%, var(--bg)); --paper-rule: color-mix(in srgb, var(--blue) 22%, transparent); --ink: var(--on-primary);
   /* шрифты */
   --font-text: Literata, Georgia, "Times New Roman", serif;
   --font-ui: Commissioner, system-ui, -apple-system, "Segoe UI", sans-serif;

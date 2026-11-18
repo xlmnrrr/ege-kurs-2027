@@ -8,6 +8,8 @@ import { sound } from './extras.js';
 import { startSync, syncNow, syncStatus } from './sync.js';
 import { enter as fxEnter, initLight } from './fx.js';
 import { mountSolid, solidHTML } from './solid.js';
+import { shelfHTML, mountShelf, closeBook } from './shelf.js';
+import { mountModels, pendulumHTML, ruBookHTML } from './models.js';
 
 export const App = { K: null, keys: null, catalog: [], bundles: {}, tasksById: {}, S: fold([]), version: null };
 const $ = (s, r = document) => r.querySelector(s);
@@ -101,8 +103,20 @@ async function enter() {
   header();
   startSync(App);
   addEventListener('hashchange', route);
+  document.addEventListener('click', (e) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const row = e.target.closest('.ct-row, .sp-ribbon .rb, [data-ch-up]');
+    if (row) {
+      App.vt = true;
+      if (row.dataset.chUp) App.vtBack = row.dataset.chUp;
+      else [['.ct-n, span', 'ch-num'], ['.ct-t b', 'ch-title']].forEach(([sel, nm]) => { const el = row.querySelector(sel); if (el) el.style.viewTransitionName = nm; });
+    }
+    const turn = e.target.closest('[data-turn]');
+    if (turn && !matchMedia('(prefers-reduced-motion: reduce)').matches) { document.documentElement.dataset.turn = turn.dataset.turn; setTimeout(() => { delete document.documentElement.dataset.turn; }, 900); }
+  }, true);
+  document.addEventListener('click', (e) => { const c = e.target.closest('[data-close-book]'); if (!c || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); closeBook(c.closest('[data-book]')?.dataset.book); });
   // пришёл прогресс с другого устройства — перерисовать обзорные страницы (не трогаем номер, чтобы не сбить решение)
-  addEventListener('ege-synced', () => { const hsh = location.hash.replace(/^#\/?/, ''); if (!hsh || /^(м|ф|р|заметки|повтор)\/?$/.test(decodeURIComponent(hsh))) route(); });
+  addEventListener('ege-synced', () => { if (document.querySelector('.shelf.choosing')) return; /* книга летит — не перерисовывать */ const hsh = location.hash.replace(/^#\/?/, ''); if (!hsh || /^(м|ф|р|заметки|повтор)\/?$/.test(decodeURIComponent(hsh))) route({ quiet: true }); });
   route();
   // день занятий: минуты считаем по активному времени на странице
   let last = Date.now(), acc = 0;
@@ -129,10 +143,13 @@ function header() {
   menu.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
   addEventListener('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
 }
-export function setSyncDot(state) { const d = $('.sync-dot'); if (d) { d.className = `sync-dot ${state}`; d.title = { ok: 'Прогресс синхронизирован', wait: 'Есть неотправленный прогресс', off: 'Синхронизация недоступна — прогресс хранится на устройстве' }[state] || ''; } }
+// точек две: в шапке внутренних страниц и под полкой на главной; последнее состояние помним для новой полки
+let dotState = 'off';
+export function setSyncDot(state = dotState) { dotState = state; document.querySelectorAll('.sync-dot').forEach((d) => { d.className = `sync-dot ${state}`; d.title = { ok: 'Прогресс синхронизирован', wait: 'Есть неотправленный прогресс', off: 'Синхронизация недоступна — прогресс хранится на устройстве' }[state] || ''; }); }
 
 // ---------- маршруты ----------
-async function route() {
+async function route(opts) {
+  const quiet = opts?.quiet === true, keepY = quiet ? scrollY : 0; // тихая перерисовка (пришёл прогресс): без каскада и без прыжка наверх
   const parts = decodeURIComponent(location.hash.replace(/^#\/?/, '')).split('/').filter(Boolean);
   const main = $('#main');
   document.querySelectorAll('.nav a').forEach((a) => a.toggleAttribute('aria-current', false));
@@ -140,8 +157,10 @@ async function route() {
   const navA = [...document.querySelectorAll('.nav a')].find((a) => a.getAttribute('href') === cur);
   if (navA) navA.setAttribute('aria-current', 'page');
   let view;
+  const adopted = App.adopt && decodeURIComponent(location.hash) === App.adopt.hash ? App.adopt.node : null; App.adopt = null;
   try {
-    if (!parts.length) view = await home();
+    if (adopted) view = adopted; // страница прилетела из книги — уже готова
+    else if (!parts.length) view = await home();
     else if (SUBJ[parts[0]] && !parts[1]) view = subjectView(SUBJ[parts[0]]);
     else if (SUBJ[parts[0]] && parts[1]) {
       const n = App.catalog.find((x) => x.subject === SUBJ[parts[0]] && x.num === +parts[1]);
@@ -154,17 +173,51 @@ async function route() {
     else if (parts[0] === 'диагностика') view = await (await import('./diag.js')).renderDiag(App, parts[1]);
     else view = notFound();
   } catch (e) { console.error(e); view = h(`<div class="page"><h1>Не открылось</h1><p class="lead">${esc(e.message)}. Обнови страницу; если повторится — проверь, что сайт обновился.</p></div>`); }
-  main.innerHTML = ''; main.appendChild(view);
-  scrollTo(0, 0);
+  if (quiet) view.classList.add('sp-quiet');
+  // глава открывается/закрывается перелётом: номер из оглавления становится цифрой главы и обратно (View Transitions)
+  const vt = App.vt && !quiet && !adopted && !!document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches; App.vt = false;
+  const named = [];
+  let backRow = null;
+  if (vt && App.vtBack) {
+    const bn = App.catalog.find((x) => x.id === App.vtBack);
+    backRow = bn && view.querySelector(`.ct-row[href="${numLink(bn)}"]`);
+    if (backRow) [['.ct-n', 'ch-num'], ['.ct-t b', 'ch-title']].forEach(([sel, nm]) => { const el = backRow.querySelector(sel); if (el) { el.style.viewTransitionName = nm; named.push(el); } });
+  }
+  App.vtBack = null;
+  const swap = () => {
+    main.innerHTML = ''; main.appendChild(view);
+    // главная — полка из трёх книг вместо шапки; на остальных страницах шапка на месте
+    $('#top').hidden = !parts.length; document.body.classList.remove('menu-open');
+    if (backRow) backRow.scrollIntoView({ block: 'center' }); else scrollTo(0, keepY);
+  };
+  if (vt) {
+    const t = document.startViewTransition(swap);
+    try { await t.updateCallbackDone; } catch { if (!view.isConnected) swap(); }
+    t.finished.finally(() => named.forEach((el) => (el.style.viewTransitionName = '')));
+  } else swap();
+  if (!parts.length) setSyncDot();
   setView((SUBJ[parts[0]] && parts[1]) || ['повтор', 'заметки'].includes(parts[0]) || (parts[0] === 'формулы' && parts[1]) || (parts[0] === 'диагностика' && parts[1]));
-  view.querySelectorAll('.solid').forEach(mountSolid);
-  fxEnter(view);
+  mountModels(view);
+  if (!adopted && !quiet && !vt && !document.documentElement.dataset.turn) fxEnter(view); // из книги, перелётом или перелистыванием — свой переход, каскад не нужен
   document.title = (view.dataset.title ? view.dataset.title + ' — ' : '') + 'ЕГЭ курс 2027';
-  main.focus({ preventScroll: true });
+  if (!quiet) main.focus({ preventScroll: true });
+  dispatchEvent(new Event('ege-routed')); // полка ждёт его, чтобы снять слой полёта
 }
 /** Страница чтения — фон спокойный и неподвижный (bg.js слушает ege-view) */
 function setView(read) { const v = read ? 'read' : 'open'; if (document.documentElement.dataset.view !== v) { document.documentElement.dataset.view = v; dispatchEvent(new Event('ege-view')); } }
 const notFound = () => h('<div class="page"><h1>Такой страницы нет</h1><p><a href="#/">На главную</a></p></div>');
+
+/** Мини-страница предмета для книги на полке: шапка + страница, как будет после перехода */
+function bookPreview(key) {
+  const sub = { m: 'математика', f: 'физика', r: 'русский' }[key]; if (!sub) return null;
+  const wrap = document.createElement('div'); wrap.inert = true; wrap.setAttribute('aria-hidden', 'true');
+  const top = $('#top').cloneNode(true); top.hidden = false;
+  top.querySelectorAll('.nav a').forEach((x) => x.toggleAttribute('aria-current', x.getAttribute('href') === '#/' + LETTER[sub]));
+  const main = document.createElement('div'); main.className = 'pv-main'; main.appendChild(subjectView(sub));
+  wrap.append(top, main); wrap.querySelectorAll('[id]').forEach((x) => x.removeAttribute('id'));
+  mountModels(wrap);
+  return wrap;
+}
 
 // ---------- главная ----------
 const mastered = (sub) => App.catalog.filter((n) => n.subject === sub && statusOf(n) === 'done').length;
@@ -203,15 +256,23 @@ async function home() {
   const nm = nextOf('математика'), nf = nextOf('физика');
   if (nm) tiles.push([numLink(nm), 'Математика, №' + nm.num, esc(nm.title), 'math']);
   if (nf) tiles.push([numLink(nf), 'Физика, №' + nf.num, esc(nf.title), 'phys']);
-  const v = h(`<div class="page" data-title="Сегодня"><div class="home2">
+  const shelf = shelfHTML({
+    lead: dr !== null && dr >= 0 ? `До сочинения ${plural(dr, 'день', 'дня', 'дней')}, до математики ${plural(dm, 'день', 'дня', 'дней')}` : `До математики ${plural(dm, 'день', 'дня', 'дней')}, до физики ${plural(df, 'день', 'дня', 'дней')}`,
+    books: [
+      { key: 'm', href: '#/м', title: 'Математика', sub: `профиль, ${plural(bySub('математика').length, 'номер', 'номера', 'номеров')}`, done: doneIn('математика'), total: bySub('математика').length },
+      { key: 'r', href: '#/р', title: 'Русский', sub: 'итоговое сочинение', done: doneIn('русский'), total: bySub('русский').length },
+      { key: 'f', href: '#/ф', title: 'Физика', sub: plural(bySub('физика').length, 'номер', 'номера', 'номеров'), done: doneIn('физика'), total: bySub('физика').length },
+    ],
+    nav: [['today', 'Сегодня'], ['#/формулы', 'Формулы'], ['#/заметки', 'Заметки'], ['#/повтор', 'Повторение ошибок'], ['#/диагностика', 'Диагностика'], ['#/настройки', 'Настройки']],
+  });
+  const v = h(`<div class="home-wrap" data-title="Сегодня">${shelf}<div class="page home-today" id="today"><div class="home2">
     <header class="hero dash-hero">
       <div class="hero-t">
         <p class="eyebrow">${esc(date)}</p>
-        <h1>${dr !== null ? 'До сочинения <em>' + dr + '</em> ' + pd(dr) : 'ЕГЭ курс 2027'}</h1>
+        <h2 class="dash-h1">${dr !== null ? 'До сочинения <em>' + dr + '</em> ' + pd(dr) : 'Сегодня'}</h2>
         <p class="lead">${dr !== null ? 'Ближайший экзамен — итоговое сочинение, ' + dt(ex['русский']) + '. Дальше математика ' + dt(ex['математика']) + ' и физика ' + dt(ex['физика']) + '.' : 'Математика, физика и русский — в одном месте.'}</p>
         <div class="dash-go">
           ${due ? `<a class="btn primary" href="#/повтор">Повторить ошибки: ${due}</a>` : next ? `<a class="btn primary" href="${numLink(next)}">Продолжить: ${SUBJ_SHORT[next.subject]} №${next.num}</a>` : ''}
-          <a class="btn" href="#/р">Русский</a><a class="btn" href="#/м">Математика</a><a class="btn" href="#/ф">Физика</a>
         </div>
         <div class="hero-stats">
           <span><b data-count="${doneIn('математика')}">${doneIn('математика')}</b> из ${bySub('математика').length} по математике</span>
@@ -242,7 +303,8 @@ async function home() {
           <p class="muted ui small">Освоенные номера × баллы по шкале 2026.</p></section>
         <section class="card mini"><div><b data-count="${st}">${st}</b><span>серия дней</span></div><div><b>${lv.lv}</b><span>уровень</span><div class="bar"><i style="width:${((lv.xp - lv.prev) / (lv.next - lv.prev)) * 100}%"></i></div></div></section>
       </aside>
-    </div></div></div>`);
+    </div></div></div></div>`);
+  mountShelf(v, { preview: bookPreview, adopt: (hash, node) => { App.adopt = { hash, node }; }, onSound: () => { sound.toggle(); if (sound.on) sound.play('ok'); }, soundOn: () => sound.on, onCalc: async () => (await import('./calc.js')).openCalc(), icon });
   v.querySelector('#pmap').addEventListener('toggle', (e) => { try { localStorage.setItem('pmap', e.target.open ? '1' : '0'); } catch { /* приватный режим */ } });
   return v;
 }
@@ -258,7 +320,7 @@ function blockHTML(b) {
   const what = b.kind === 'review' ? `Повторение ошибок${b.count ? ` — ${plural(b.count, 'задача', 'задачи', 'задач')}` : ' — пока нечего повторять, реши пару задач прошлых номеров'}`
     : b.kind === 'number' && n ? `<a href="${numLink(n)}">${SUBJ_SHORT[n.subject] || n.subject}, №${n.num}. ${esc(n.title)}</a> — ${b.stage === 'с нуля' ? '«Проверить себя» → задачи по типам, теория — кнопкой в задаче' : 'продолжаем задачи по типам'}${n.hasContent ? '' : ' <span class="muted">(разбор готовится)</span>'}`
       : b.kind === 'mock' ? `Пробник на 235 минут: ${b.subject}` : `Смешанные задачи: ${b.subject}`;
-  return `<li class="tl"><span class="min">${b.minutes}<small>мин</small></span><span class="what">${what}</span></li>`;
+  return `<li class="ct-l"><span class="min">${b.minutes}<small>мин</small></span><span class="what">${what}</span></li>`;
 }
 function startHref(d, due) {
   if (due) return '#/повтор';
@@ -283,51 +345,85 @@ const RU_STEPS = [
   [5, 'Расписание', 'План на 30 дней и как сжать его под 22 дня до экзамена.'],
   [6, 'Проверка', 'Вставь готовое сочинение и сразу увидишь слова, абзацы, ритм и ошибки.'],
 ];
-/** Русский — свой раздел: маршрут «как двигаться» вместо сетки карточек */
-function ruSubjectView(nums, hero) {
-  const byNum = {}; nums.forEach((n) => (byNum[n.num] = n));
-  const read = App.S.read || {};
-  const readDone = (id) => Object.keys(read).filter((k) => k.startsWith(id + '|') && read[k].status === 'done').length;
-  const steps = RU_STEPS.map(([num, title, what], i) => {
-    const n = byNum[num]; if (!n) return '';
-    const rd = readDone(n.id);
-    const mark = rd ? `<span class="ru-done">прочитано ${rd}</span>` : '';
-    return `<a class="ru-step" href="${numLink(n)}"><span class="ru-dot">${i + 1}</span>` +
-      `<span class="ru-step-t"><b>${esc(title)}</b><span>${esc(typeof what === 'function' ? what() : what)}</span></span>` +
-      `${mark}<span class="ru-step-m">~${n.minutes} мин</span><span class="ru-arrow">›</span></a>`;
-  }).join('');
-  return h(`<div class="page" data-title="Русский">
-    <div class="sub-hero"><div><p class="eyebrow">${esc(hero.eyebrow)}</p><h1>${esc(hero.name)}</h1>
-      <p class="lead">Полный курс к итоговому сочинению: пять разделов и ${worksCount()} произведений с готовыми аргументами.</p>
-      <p class="muted ui">Экзамен 2 декабря 2026 · 3 часа 55 минут · минимум 250 слов, лучше 350</p></div></div>
-    <section class="card"><h3>Как двигаться</h3>
-      <p class="muted ui" style="margin-top:0">Проходи по порядку: от каркаса к аргументам. Это около трёх с половиной часов чтения, дальше только повторение.</p>
-      <div class="ru-road">${steps}</div></section>
-    <div class="note ui no-print">Не знаешь, с чего начать, — открой <b>шаг 1</b>. Тридцати минут хватит, чтобы понять, как устроено сочинение и за что дают зачёт.</div>
+// «Раскрытая книга» (18.11.2026): титульный лист (название, 3D-модель, номерная лента, «Продолжить») + оглавление вместо сетки карточек.
+const SUBJ_KEY = { математика: 'm', физика: 'f', русский: 'r' };
+const BACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+const ST_TEXT = { done: 'освоен', work: 'в работе', new: 'не начат', soon: 'скоро' };
+const ROMAN = ['I', 'II'];
+/** Номерная лента: каждый номер — штрих, цвет по статусу; ведёт в номер */
+const ribbon = (items, label) => `<div class="sp-ribbon" role="list" aria-label="${esc(label)}" style="--cnt:${items.length}">${items.map((x, k) =>
+  `<a role="listitem" class="rb ${x.st}${x.n % 5 === 0 || x.n === 1 ? ' tick' : ''}" href="${x.href}" title="${esc(x.tip)}" style="--k:${k}"><i></i><span>${x.n}</span></a>`).join('')}</div>`;
+const legend = (cnt) => `<p class="sp-legend"><span class="k done"></span>освоено ${cnt.done}<span class="k work"></span>в работе ${cnt.work}<span class="k new"></span>не начато ${cnt.new}</p>`;
+/** Строка оглавления: номер, название, отточие, баллы и минуты, закладка-статус */
+const tocRow = (x) => `<li><a class="ct-row ${x.st}" href="${x.href}"><span class="ct-n">${x.n}</span>
+  <span class="ct-t"><b>${esc(x.title)}</b>${x.note ? `<small>${esc(x.note)}</small>` : ''}</span><span class="ct-l" aria-hidden="true"></span>
+  <span class="ct-m">${esc(x.meta)}</span><span class="ct-s">${esc(x.stText)}</span></a></li>`;
+const tocPart = (i, title, rows) => `<section class="ct"><h2 class="ct-h"><span class="ct-r" aria-hidden="true">${ROMAN[i] || i + 1}</span>${esc(title)}</h2><ol class="ct-list">${rows.map(tocRow).join('')}</ol></section>`;
+
+function bookPage({ key, title, meta, model, ribbonHTML, legendHTML, go, parts, after = '' }) {
+  return h(`<div class="page sp sp-${key}" data-title="${esc(title)}" data-book="${key}">
+    <header class="sp-hero">
+      <div class="sp-hero-t">
+        <a class="sp-back" href="#/" data-close-book>${BACK_ICON}<span>На полку</span></a>
+        <h1>${esc(title)}</h1>
+        <p class="sp-meta">${meta}</p>
+        ${ribbonHTML}${legendHTML}
+        ${go ? `<div class="sp-go"><a class="btn primary" href="${go.href}">${esc(go.text)}</a></div>` : ''}
+      </div>
+      <div class="sp-model">${model}</div>
+    </header>
+    ${parts}
+    ${after}
+    <footer class="sp-end no-print"><a class="btn" href="#/" data-close-book>Закрыть книгу</a></footer>
   </div>`);
 }
 
-function subjectView(subject) {
-  const nums = App.catalog.filter((n) => n.subject === subject);
-  const card = (n) => { const st = statusOf(n); return `<a class="num ${st === 'done' ? 'done' : st === 'work' ? 'work' : ''} ${n.hasContent ? '' : 'soon'}" href="${numLink(n)}">
-    <span class="n">${n.num}</span><span><span class="t">${esc(n.title)}${n.isNew ? ' · новое' : ''}</span><br><span class="s">${n.points ? plural(n.points, 'балл', 'балла', 'баллов') + ' · ' : ''}~${n.minutes} мин${n.pct2026 ? ` · решают ${Math.round(n.pct2026)}&nbsp;%` : ''}</span></span>
-    <span class="st">${n.hasContent ? { done: 'освоен', work: 'в работе', new: 'не начат' }[st] : 'скоро'}</span></a>`; };
+/** Русский — шесть шагов вместо номеров ЕГЭ */
+function ruSubjectView(nums) {
+  const byNum = {}; nums.forEach((n) => (byNum[n.num] = n));
+  const read = App.S.read || {};
+  const readDone = (id) => Object.keys(read).filter((k) => k.startsWith(id + '|') && read[k].status === 'done').length;
+  const rows = RU_STEPS.filter(([num]) => byNum[num]).map(([num, title, what]) => {
+    const n = byNum[num], rd = readDone(n.id), st = statusOf(n);
+    return { n: num, href: numLink(n), title, note: typeof what === 'function' ? what() : what, meta: n.minutes ? `~${n.minutes} мин` : '', st, stText: rd ? `прочитано ${rd}` : ST_TEXT[st] };
+  });
   const cnt = { done: 0, work: 0, new: 0 }; nums.forEach((n) => cnt[statusOf(n)]++);
-  const pct = Math.round((cnt.done / nums.length) * 100), ready = nums.filter((n) => n.hasContent).length;
-  const hero = subject === 'русский'
-    ? { eyebrow: 'ЕГЭ-2027 · итоговое сочинение', name: 'Русский', lead: `${nums.length} разделов: структура, клише, карта тем и аргументы по произведениям.` }
-    : subject === 'математика'
-      ? { eyebrow: 'ЕГЭ-2027 · профиль', name: 'Математика', lead: '20 заданий, 33 первичных балла, 235 минут.' }
-      : { eyebrow: 'ЕГЭ-2027', name: 'Физика', lead: '26 заданий, 45 первичных баллов, 235 минут.' };
-  if (subject === 'русский') return ruSubjectView(nums, hero);
-  return h(`<div class="page" data-title="${subject}"><div class="sub-hero"><div><p class="eyebrow">${hero.eyebrow}</p><h1>${hero.name}</h1>
-    <p class="lead">${hero.lead} Разборов готово: ${ready} из ${nums.length}.</p>
-    <div class="legend ui"><span><i class="done"></i>освоено ${cnt.done}</span><span><i class="work"></i>в работе ${cnt.work}</span><span><i class="new"></i>не начато ${cnt.new}</span></div></div>
-    <div class="ring big" style="--p:${pct}"><span>${pct}%<small>освоено</small></span></div></div>
-    ${subject === 'русский'
-      ? `<div class="nums">${nums.map(card).join('')}</div>`
-      : `<h2 class="part-h">Часть 1</h2><div class="nums">${nums.filter((n) => n.part === 1).map(card).join('')}</div>
-    <h2 class="part-h">Часть 2 — развёрнутый ответ</h2><div class="nums">${nums.filter((n) => n.part === 2).map(card).join('')}</div>`}</div>`);
+  const next = rows.find((x) => x.st !== 'done') || rows[0];
+  return bookPage({
+    key: 'r', title: 'Русский',
+    meta: `Итоговое сочинение 2 декабря 2026. Шесть шагов и ${worksCount()} произведений с готовыми аргументами; минимум 250 слов, лучше 350.`,
+    model: ruBookHTML(RU_STEPS.map(([n, t]) => [n, t])),
+    ribbonHTML: ribbon(rows.map((x) => ({ n: x.n, st: x.st, href: x.href, tip: `Шаг ${x.n}. ${x.title}: ${x.stText}` })), `Шаги: освоено ${cnt.done}, в работе ${cnt.work}, не начато ${cnt.new}`),
+    legendHTML: legend(cnt),
+    go: next && { href: next.href, text: `${next.st === 'new' && next.n === 1 ? 'Начать' : 'Продолжить'}: шаг ${next.n}, ${next.title}` },
+    parts: tocPart(0, 'Как двигаться — от каркаса к аргументам', rows),
+    after: '<p class="sp-note no-print">Не знаешь, с чего начать, — открой шаг 1. Тридцати минут хватит, чтобы понять, как устроено сочинение и за что дают зачёт.</p>',
+  });
+}
+
+function subjectView(subject) {
+  const nums = App.catalog.filter((n) => n.subject === subject).sort((a, b) => a.num - b.num);
+  if (subject === 'русский') return ruSubjectView(nums);
+  const key = SUBJ_KEY[subject];
+  const cnt = { done: 0, work: 0, new: 0 };
+  const items = nums.map((n) => {
+    const st = statusOf(n); cnt[st]++;
+    const stv = n.hasContent ? st : 'soon';
+    const meta = [n.points ? plural(n.points, 'балл', 'балла', 'баллов') : '', `~${n.minutes} мин`].filter(Boolean).join(', ');
+    return { n: n.num, part: n.part, href: numLink(n), title: n.title + (n.isNew ? ', новое' : ''), note: n.pct2026 ? `решают ${Math.round(n.pct2026)} %` : '', meta, st: stv, stText: ST_TEXT[stv],
+      tip: `№${n.num}. ${n.title}: ${ST_TEXT[stv]}` };
+  });
+  const next = items.find((x) => x.st === 'work') || items.find((x) => x.st === 'new');
+  const pts = nums.reduce((s, n) => s + (n.points || 0), 0); // сумма баллов номеров каталога: математика 32 (итоговая демоверсия 2027), физика 45
+  return bookPage({
+    key, title: SUBJ_SHORT[subject],
+    meta: `${subject === 'математика' ? 'Профиль. ' : ''}${plural(nums.length, 'задание', 'задания', 'заданий')}, ${plural(pts, 'первичный балл', 'первичных балла', 'первичных баллов')}, 235 минут.`,
+    model: subject === 'математика' ? solidHTML('sp-model-fig') : pendulumHTML(),
+    ribbonHTML: ribbon(items, `Номера: освоено ${cnt.done}, в работе ${cnt.work}, не начато ${cnt.new}`),
+    legendHTML: legend(cnt),
+    go: next && { href: next.href, text: `${next.st === 'work' ? 'Продолжить' : 'Начать'}: №${next.n}, ${nums.find((n) => n.num === next.n).title}` },
+    parts: tocPart(0, 'Часть первая — краткий ответ', items.filter((x) => x.part === 1)) + tocPart(1, 'Часть вторая — развёрнутый ответ', items.filter((x) => x.part === 2)),
+  });
 }
 
 // ---------- план ----------

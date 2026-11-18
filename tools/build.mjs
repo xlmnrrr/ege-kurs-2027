@@ -131,7 +131,10 @@ async function main() {
   const only = process.argv.slice(2);
   mkdirSync(OUT, { recursive: true });
   const K = await importK(dataKey());
-  const catalogBase = JSON.parse(readFileSync(join(CONTENT, 'номера.json'), 'utf8')); // все номера 2027: название, баллы, минуты, часть
+  const catalogAll = JSON.parse(readFileSync(join(CONTENT, 'номера.json'), 'utf8')); // все номера 2027: название, баллы, минуты, часть
+  // номера вне экзамена (archived: true — например, проект 2027 отменён итоговой демоверсией) не собираются и на сайт не попадают
+  const archivedIds = new Set(catalogAll.filter((n) => n.archived).map((n) => n.id));
+  const catalogBase = catalogAll.filter((n) => !n.archived);
   const infos = {};
   for (const [subject, letter] of Object.entries(SUBJ)) {
     const sdir = join(CONTENT, subject);
@@ -140,6 +143,7 @@ async function main() {
       const dir = join(sdir, nn);
       if (!existsSync(join(dir, 'номер.md'))) continue;
       const id = `${letter}${nn}`;
+      if (archivedIds.has(id)) { console.log(`${id}: в архиве (вне экзамена) — пропущен`); continue; }
       if (only.length && !only.includes(id)) { infos[id] = { id, hasContent: true, keep: true }; continue; }
       const { bundle, info, imgBytes } = buildNumber(dir, subject, +nn);
       const bin = await seal(K, gzipSync(Buffer.from(JSON.stringify(bundle)), { level: 9 })); // сжатие до шифрования
@@ -158,7 +162,7 @@ async function main() {
       const f = join(ddir, `${subject}.json`);
       if (!existsSync(f) || (only.length && !only.includes(did))) continue;
       const raw = JSON.parse(readFileSync(f, 'utf8'));
-      const tasks = raw.filter((t) => t.проверка?.статус !== 'спорная').map((t) => ({ id: t.id, num: t.номер_id, part: t.часть, q: mdText(t.условие), a: String(t.ответ ?? ''), tol: t.допуск || null,
+      const tasks = raw.filter((t) => t.проверка?.статус !== 'спорная' && !archivedIds.has(t.номер_id)).map((t) => ({ id: t.id, num: t.номер_id, part: t.часть, q: mdText(t.условие), a: String(t.ответ ?? ''), tol: t.допуск || null,
         fig: t.рисунок ? camel(t.рисунок) : null, sol: mdText(t.решение), criteria: t.критерии ? mdText(t.критерии) : '', max: t.макс || 1, src: t.источник || null }));
       const bin = await seal(K, gzipSync(Buffer.from(JSON.stringify({ id: did, subject, tasks, figures: figSrc })), { level: 9 }));
       writeFileSync(join(OUT, `${did}.bin`), bin);
@@ -181,7 +185,9 @@ async function main() {
       console.log(`${sid}: справочник «${meta.название || name}», ${(bin.length / 1024).toFixed(0)} КБ`);
     }
   }
-  const catalog = catalogBase.map((n) => ({ ...n, ...(infos[n.id] && !infos[n.id].keep ? infos[n.id] : {}), hasContent: !!infos[n.id] }));
+  // номер, часть и баллы — из каталога (структура экзамена), а не из папки: id номера не меняется, когда меняется его номер в КИМ
+  const catalog = catalogBase.map((n) => { const inf = infos[n.id] && !infos[n.id].keep ? infos[n.id] : {};
+    return { ...n, ...inf, num: n.num, part: n.part, points: n.points, title: n.subject === 'русский' ? inf.title || n.title : n.title || inf.title, minutes: n.subject === 'русский' ? inf.minutes ?? n.minutes : n.minutes ?? inf.minutes, hasContent: !!infos[n.id] }; });
   const cat = await seal(K, gzipSync(Buffer.from(JSON.stringify({ numbers: catalog, built: new Date().toISOString() })), { level: 9 }));
   writeFileSync(join(OUT, 'catalog.bin'), cat);
   const h = createHash('sha256');
