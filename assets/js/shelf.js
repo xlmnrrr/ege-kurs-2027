@@ -105,25 +105,39 @@ function tilt(screen, shelf) {
 }
 function untilt(b) { b.classList.remove('tilting'); ['--ry', '--rx', '--gx', '--gy'].forEach((p) => b.style.removeProperty(p)); }
 
-/** «Влёт в книгу» (v3, 19.11): книга выплывает в центр → раскрывается, на развороте — крупное название предмета →
- *  тёмный разворот с названием растягивается на весь экран → название плавно тает → под слоем уже готова страница
- *  предмета, слой мягко растворяется. Всё — только transform и opacity (их ведёт видеокарта, на телефоне без рывков);
- *  ни одной копии страницы внутри книги, живой фон на время полёта стоит.
+/** «Влёт в книгу» (v4, 19.11): название предмета напечатано на развороте — левая половина на внутренней стороне обложки,
+ *  правая на странице, его видно уже при раскрытии. Обложка легла — книгу без шва подменяет такой же слой, он растягивается
+ *  на весь экран, а название тает по ходу приближения; под слоем строится страница предмета и проявляется.
+ *  Только transform и opacity (их ведёт видеокарта), живой фон на время полёта стоит.
  *  Порядок держат таймеры, а не события анимаций — так он доходит до конца и в фоновой вкладке. */
 const TITLES = { m: ['Профильная математика', 'ЕГЭ-2027, 19 заданий'], f: ['Физика', 'ЕГЭ-2027, 26 заданий'], r: ['Русский язык', 'Итоговое сочинение'] };
+const titleHTML = (t1, t2) => `<b>${t1}</b><span>${t2}</span>`;
 function flyInto(a, screen, shelf) {
-  const body = a.querySelector('.book-body'), cover = a.querySelector('.book-cover');
+  const body = a.querySelector('.book-body'), cover = a.querySelector('.book-cover'), page = a.querySelector('.book-page');
   const href = a.getAttribute('href'), key = a.dataset.book, timers = [];
   const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+  const [t1, t2] = TITLES[key] || ['', ''];
   // все замеры — один раз и до смены классов: никаких чтений раскладки посреди движения
   const vw = innerWidth, vh = innerHeight, br = a.getBoundingClientRect(), W = br.width, H = body.offsetHeight;
   const cur = getComputedStyle(body).transform;
   untilt(a);
+  // название на листах: обе половины — одна и та же надпись шириной в разворот, каждая показывает свою часть
+  const fsb = Math.max(9, W * 0.21), twb = 2 * W * 0.86;
+  for (const [host, side] of [[cover.querySelector('.bc-back'), 'l'], [page, 'r']]) {
+    const el = document.createElement('span'); el.className = `bt bt-${side}`; el.setAttribute('aria-hidden', 'true');
+    el.style.setProperty('--fsb', `${fsb.toFixed(2)}px`); el.style.setProperty('--twb', `${twb.toFixed(1)}px`);
+    el.innerHTML = `<span class="bt-in">${titleHTML(t1, t2)}</span>`;
+    host.appendChild(el);
+  }
+  // мягкий ореол цвета фона вокруг листов: у раскрытого разворота нет резких краёв
+  const halo = W * 0.16;
+  body.style.setProperty('--halo', `${halo.toFixed(1)}px`);
   a.classList.add('open', 'flying');
   shelf.classList.add('choosing'); screen.classList.add('choosing');
+  dispatchEvent(new CustomEvent('ege-bg', { detail: { pause: true } }));
+
   const s = Math.max(1, Math.min((vh * 0.74) / H, (vw * 0.88) / (2 * W)));         // раскрытый разворот 2W·s
-  const cx = br.left + W / 2, cy = br.top + H / 2;
-  const dx0 = vw / 2 - cx, dy = vh / 2 - cy, shift = (W * s) / 2;                    // сначала по центру книга, потом — разворот
+  const dx0 = vw / 2 - (br.left + W / 2), dy = vh / 2 - (br.top + H / 2), shift = (W * s) / 2; // сначала по центру книга, потом — разворот
   const ease = 'cubic-bezier(.22,.8,.2,1)', glide = 'cubic-bezier(.45,0,.25,1)';
   body.animate([{ transform: cur === 'none' ? 'none' : cur }, { transform: `translate(${dx0}px, ${dy}px) scale(${s})` }], { duration: 640, easing: ease, fill: 'forwards' });
   body.animate([{ translate: '0px 0px' }, { translate: `${shift}px 0px` }], { duration: 620, delay: 240, easing: glide, fill: 'forwards' });
@@ -131,32 +145,27 @@ function flyInto(a, screen, shelf) {
   a.animate([{ perspectiveOrigin: '50% 50%' }, { perspectiveOrigin: `${(vw / 2 - br.left).toFixed(1)}px ${(vh / 2 - br.top).toFixed(1)}px` }], { duration: 860, easing: glide, fill: 'forwards' });
   cover.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(-180deg)' }], { duration: 640, delay: 220, easing: 'cubic-bezier(.35,.1,.25,1)', fill: 'forwards' });
 
-  // слой полёта: тёмный «разворот» (совпадает с раскрытой книгой) + название предмета; строится через 0,3 с, на лету
-  const sw = 2 * W * s, sh = H * s, L = vw / 2 - W * s, T = vh / 2 - sh / 2;
+  // обложка легла — книгу без шва подменяет такой же слой (тот же цвет, та же надпись на том же месте)
+  const hs = halo * s * 1.1, sw = 2 * W * s + 2 * hs, sh = H * s + 2 * hs; // разворот вместе с ореолом
   let fly = null;
-  at(300, () => {
-  dispatchEvent(new CustomEvent('ege-bg', { detail: { pause: true } }));
-  const [t1, t2] = TITLES[key] || ['', ''];
-  fly = document.createElement('div');
-  fly.className = 'fly'; fly.setAttribute('aria-hidden', 'true');
-  fly.style.setProperty('--fs', `${Math.max(22, Math.min(64, W * s * 0.21)).toFixed(1)}px`);
-  fly.style.setProperty('--tw', `${Math.min(vw * 0.9, sw * 0.86).toFixed(1)}px`);
-  fly.innerHTML = `<div class="fly-panel"></div><div class="fly-title"><b>${t1}</b><span>${t2}</span></div>`;
-  document.body.appendChild(fly);
-  const panel = fly.querySelector('.fly-panel'), title = fly.querySelector('.fly-title');
-  const P0 = `translate(${L.toFixed(1)}px, ${T.toFixed(1)}px) scale(${(sw / vw).toFixed(4)}, ${(sh / vh).toFixed(4)})`;
-  panel.style.transform = P0;
-  // разворот лёг — на нём проступает название (тёмный слой того же цвета, что листы книги, — шва не видно)
-  panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, delay: 420, easing: 'ease-out', fill: 'forwards' });
-  title.animate([{ opacity: 0, transform: 'translate(-50%, -50%) scale(.96)' }, { opacity: 1, transform: 'translate(-50%, -50%) scale(1)' }], { duration: 420, delay: 460, easing: 'ease-out', fill: 'forwards' });
-  // разворот растягивается на весь экран, книга под ним тает; название растёт вместе с ним
-  const grow = 'cubic-bezier(.55,0,.2,1)';
-  panel.animate([{ transform: P0 }, { transform: 'translate(0px, 0px) scale(1, 1)' }], { duration: 640, delay: 880, easing: grow, fill: 'forwards' });
-  title.animate([{ transform: 'translate(-50%, -50%) scale(1)' }, { transform: 'translate(-50%, -50%) scale(1.22)' }], { duration: 640, delay: 880, easing: grow, fill: 'forwards', composite: 'replace' });
-  body.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, delay: 1000, easing: 'ease-in', fill: 'forwards' });
+  at(880, () => {
+    fly = document.createElement('div');
+    fly.className = 'fly'; fly.setAttribute('aria-hidden', 'true');
+    fly.style.setProperty('--fs', `${(fsb * s).toFixed(2)}px`); fly.style.setProperty('--tw', `${(twb * s).toFixed(1)}px`);
+    fly.innerHTML = `<div class="fly-panel"></div><div class="fly-title">${titleHTML(t1, t2)}</div>`;
+    const panel = fly.querySelector('.fly-panel'), title = fly.querySelector('.fly-title');
+    // виньетка: эллипс в пропорциях экрана, сплошная середина (62 % радиуса) и мягкий уход в прозрачность к краям.
+    // Начало — сплошная часть ровно накрывает разворот; конец — накрывает весь экран вместе с углами
+    const CORE = 0.62, k0 = Math.hypot(sw / vw, sh / vh) / (2 * CORE), k1 = 1.25;
+    panel.style.transform = `translate(-50%, -50%) scale(${k0.toFixed(4)})`;
+    document.body.appendChild(fly);
+    const grow = 'cubic-bezier(.45,0,.2,1)';
+    panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out', fill: 'forwards' });
+    panel.animate([{ transform: `translate(-50%, -50%) scale(${k0.toFixed(4)})` }, { transform: `translate(-50%, -50%) scale(${k1})` }], { duration: 760, delay: 60, easing: grow, fill: 'forwards' });
+    // название по ходу приближения растёт и тает; книга под виньеткой растворяется
+    title.animate([{ opacity: 1, transform: 'translate(-50%, -50%) scale(1)' }, { opacity: 0, transform: 'translate(-50%, -50%) scale(1.35)' }], { duration: 560, delay: 80, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'forwards' });
+    body.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, delay: 160, easing: 'ease-in', fill: 'forwards' });
   });
-  // экран занят разворотом — название плавно тает
-  at(1700, () => fly?.querySelector('.fly-title').animate([{ opacity: 1 }, { opacity: 0 }], { duration: 420, easing: 'ease-in-out', fill: 'forwards', composite: 'replace' }));
 
   // переход: страница строится под непрозрачным слоем, потом слой мягко растворяется
   let gone = false;
@@ -170,15 +179,15 @@ function flyInto(a, screen, shelf) {
       // два кадра — чтобы новая страница успела отрисоваться, прежде чем слой начнёт растворяться
       requestAnimationFrame(() => requestAnimationFrame(() => {
         const f = fly;
-        if (f) { f.animate([{ opacity: getComputedStyle(f.querySelector('.fly-panel')).opacity }, { opacity: 0 }], { duration: 520, easing: 'ease-out', fill: 'forwards' }); setTimeout(() => f.remove(), 560); }
-        setTimeout(() => dispatchEvent(new CustomEvent('ege-bg', { detail: { pause: false } })), 560);
+        if (f) { f.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 480, easing: 'ease-out', fill: 'forwards' }); setTimeout(() => f.remove(), 520); }
+        setTimeout(() => dispatchEvent(new CustomEvent('ege-bg', { detail: { pause: false } })), 520);
       }));
     };
     addEventListener('ege-routed', reveal, { once: true });
     setTimeout(reveal, 1500); // страховка: страница не сообщила о себе
     location.hash = href;
   };
-  at(2130, go);
+  at(1460, go);
   // пропустить полёт: любой клик или Esc/Enter/пробел
   const onSkip = (e) => { e.preventDefault(); go(); };
   const onKey = (e) => { if (['Escape', 'Enter', ' '].includes(e.key)) { e.preventDefault(); go(); } };
