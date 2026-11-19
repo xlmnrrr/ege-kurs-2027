@@ -79,7 +79,7 @@ export function mountShelf(view, { onSound, onCalc, soundOn, icon, play, preview
     try { sessionStorage.setItem(BACK_KEY, a.dataset.book); } catch { /* приватный режим */ }
     if (still()) { location.hash = a.getAttribute('href'); return; }
     play?.();
-    flyInto(a, screen, shelf, { preview, adopt });
+    flyInto(a, screen, shelf);
   });
 }
 
@@ -105,96 +105,80 @@ function tilt(screen, shelf) {
 }
 function untilt(b) { b.classList.remove('tilting'); ['--ry', '--rx', '--gx', '--gy'].forEach((p) => b.style.removeProperty(p)); }
 
-/** «Влёт в книгу»: внутри раскрытой книги — живая мини-страница предмета; она растягивается до экрана и становится
- *  настоящей страницей (тот же узел переезжает в #main — модель не перезапускается, шва нет).
+/** «Влёт в книгу» (v3, 19.11): книга выплывает в центр → раскрывается, на развороте — крупное название предмета →
+ *  тёмный разворот с названием растягивается на весь экран → название плавно тает → под слоем уже готова страница
+ *  предмета, слой мягко растворяется. Всё — только transform и opacity (их ведёт видеокарта, на телефоне без рывков);
+ *  ни одной копии страницы внутри книги, живой фон на время полёта стоит.
  *  Порядок держат таймеры, а не события анимаций — так он доходит до конца и в фоновой вкладке. */
-function flyInto(a, screen, shelf, { preview, adopt }) {
-  const body = a.querySelector('.book-body'), cover = a.querySelector('.book-cover'), page = a.querySelector('.book-page');
-  const href = a.getAttribute('href'), timers = [];
+const TITLES = { m: ['Профильная математика', 'ЕГЭ-2027, 19 заданий'], f: ['Физика', 'ЕГЭ-2027, 26 заданий'], r: ['Русский язык', 'Итоговое сочинение'] };
+function flyInto(a, screen, shelf) {
+  const body = a.querySelector('.book-body'), cover = a.querySelector('.book-cover');
+  const href = a.getAttribute('href'), key = a.dataset.book, timers = [];
   const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+  // все замеры — один раз и до смены классов: никаких чтений раскладки посреди движения
+  const vw = innerWidth, vh = innerHeight, br = a.getBoundingClientRect(), W = br.width, H = body.offsetHeight;
+  const cur = getComputedStyle(body).transform;
   untilt(a);
   a.classList.add('open', 'flying');
   shelf.classList.add('choosing'); screen.classList.add('choosing');
-  const cw = document.documentElement.clientWidth, vw = innerWidth, vh = innerHeight;
+  const s = Math.max(1, Math.min((vh * 0.74) / H, (vw * 0.88) / (2 * W)));         // раскрытый разворот 2W·s
+  const cx = br.left + W / 2, cy = br.top + H / 2;
+  const dx0 = vw / 2 - cx, dy = vh / 2 - cy, shift = (W * s) / 2;                    // сначала по центру книга, потом — разворот
+  const ease = 'cubic-bezier(.22,.8,.2,1)', glide = 'cubic-bezier(.45,0,.25,1)';
+  body.animate([{ transform: cur === 'none' ? 'none' : cur }, { transform: `translate(${dx0}px, ${dy}px) scale(${s})` }], { duration: 640, easing: ease, fill: 'forwards' });
+  body.animate([{ translate: '0px 0px' }, { translate: `${shift}px 0px` }], { duration: 620, delay: 240, easing: glide, fill: 'forwards' });
+  // точка схода — над корешком в конце пути, чтобы раскрытая обложка не уходила в перекос
+  a.animate([{ perspectiveOrigin: '50% 50%' }, { perspectiveOrigin: `${(vw / 2 - br.left).toFixed(1)}px ${(vh / 2 - br.top).toFixed(1)}px` }], { duration: 860, easing: glide, fill: 'forwards' });
+  cover.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(-180deg)' }], { duration: 640, delay: 220, easing: 'cubic-bezier(.35,.1,.25,1)', fill: 'forwards' });
 
-  // внутри книги сразу сайт: левая половина мини-страницы — на внутренней стороне обложки, правая — на странице.
-  // Когда обложка легла, разворот = мини-страница целиком (по ширине, без обрезки), никаких подмен и проявлений.
-  const pvR = preview?.(a.dataset.book), pvL = preview?.(a.dataset.book);
-  const Wl = body.clientWidth, kpv = (2 * Wl) / cw;
-  const half = (pvEl, host, shift) => {
-    const box = document.createElement('span'); box.className = 'book-half'; box.setAttribute('aria-hidden', 'true');
-    pvEl.classList.add('pv'); pvEl.style.width = `${cw}px`; pvEl.style.height = `${vh}px`; pvEl.style.transform = `translate(${shift}px, 0px) scale(${kpv})`;
-    box.appendChild(pvEl); host.appendChild(box); return box;
-  };
-  let boxR = null;
-  if (pvR && pvL) {
-    page.classList.add('has-pv');
-    boxR = half(pvR, page, -Wl);
-    half(pvL, cover.querySelector('.bc-back'), 0);
-  }
-  // A. книга выплывает в центр: корешок — по центру экрана, раскрытая книга помещается целиком
-  const br = a.getBoundingClientRect(), W = br.width, H = body.offsetHeight;
-  // раскрытый разворот (обложка + страница = 2W·s): крупно, но с воздухом вокруг
-  const s = Math.max(1, Math.min((vh * 0.78) / H, (vw * 0.86) / (2 * W)));
-  const dx = vw / 2 + (W * s) / 2 - (br.left + W / 2), dy = vh * 0.5 - (br.top + H / 2);
-  const ease = 'cubic-bezier(.22,.8,.2,1)';
-  // точка схода — туда, где книга окажется, иначе раскрытая обложка уйдёт в перекос
-  a.animate([{ perspectiveOrigin: '50% 50%' }, { perspectiveOrigin: `${(dx + W / 2).toFixed(1)}px ${(dy + H / 2).toFixed(1)}px` }], { duration: 700, easing: ease, fill: 'forwards' });
-  // без остановки: к 0,7 с книга в центре, дальше продолжает медленно наплывать — нырок в страницу подхватывает это движение
-  const cur = getComputedStyle(body).transform;
-  body.animate([
-    { transform: cur === 'none' ? 'none' : cur, offset: 0, easing: 'cubic-bezier(.25,.75,.35,1)' },
-    { transform: `translate(${dx}px, ${dy}px) scale(${s})`, offset: 0.44, easing: 'cubic-bezier(.4,0,.7,.4)' },
-    { transform: `translate(${dx}px, ${dy}px) scale(${s * 1.1})`, offset: 1 },
-  ], { duration: 1600, fill: 'forwards' });
-  // B. обложка раскрывается по корешку
-  cover.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(-180deg)' }], { duration: 640, delay: 200, easing: 'cubic-bezier(.3,.6,.25,1)', fill: 'forwards' });
-
-  // C. страница растягивается до экрана: слой полёта забирает мини-страницу и растит её из книги
+  // слой полёта: тёмный «разворот» (совпадает с раскрытой книгой) + название предмета; строится через 0,3 с, на лету
+  const sw = 2 * W * s, sh = H * s, L = vw / 2 - W * s, T = vh / 2 - sh / 2;
   let fly = null;
-  at(860, () => {
-    // разворот на экране: правая половина — страница, левая — такая же ширина слева от корешка
-    const rr = (boxR || page).getBoundingClientRect(), left = rr.left - rr.width, r = { left, top: rr.top, right: rr.right, bottom: rr.bottom, width: rr.width * 2 };
-    fly = document.createElement('div');
-    fly.className = 'fly'; fly.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(fly);
-    const k = r.width / cw, rad = (6 * s).toFixed(1);
-    const clip0 = `inset(${r.top.toFixed(1)}px ${(vw - r.right).toFixed(1)}px ${(vh - r.bottom).toFixed(1)}px ${r.left.toFixed(1)}px round ${rad}px)`;
-    const curve = 'cubic-bezier(.32,.2,.2,1)', dur = 760;   // старт не с нуля — продолжение наплыва книги
-    fly.animate([{ clipPath: clip0 }, { clipPath: 'inset(0px 0px 0px 0px round 0px)' }], { duration: dur, easing: curve, fill: 'forwards' });
-    if (pvR) {
-      fly.appendChild(pvR);
-      pvR.style.transform = ''; pvR.animate([{ transform: `translate(${r.left}px, ${r.top}px) scale(${k})` }, { transform: 'translate(0px, 0px) scale(1)' }], { duration: dur, easing: curve, fill: 'forwards' });
-    }
-    // книга под слоем уходит в глубину — как будто камера пролетает сквозь неё
-    body.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur, easing: 'ease-in', fill: 'forwards', composite: 'replace' });
+  at(300, () => {
+  dispatchEvent(new CustomEvent('ege-bg', { detail: { pause: true } }));
+  const [t1, t2] = TITLES[key] || ['', ''];
+  fly = document.createElement('div');
+  fly.className = 'fly'; fly.setAttribute('aria-hidden', 'true');
+  fly.style.setProperty('--fs', `${Math.max(22, Math.min(64, W * s * 0.21)).toFixed(1)}px`);
+  fly.style.setProperty('--tw', `${Math.min(vw * 0.9, sw * 0.86).toFixed(1)}px`);
+  fly.innerHTML = `<div class="fly-panel"></div><div class="fly-title"><b>${t1}</b><span>${t2}</span></div>`;
+  document.body.appendChild(fly);
+  const panel = fly.querySelector('.fly-panel'), title = fly.querySelector('.fly-title');
+  const P0 = `translate(${L.toFixed(1)}px, ${T.toFixed(1)}px) scale(${(sw / vw).toFixed(4)}, ${(sh / vh).toFixed(4)})`;
+  panel.style.transform = P0;
+  // разворот лёг — на нём проступает название (тёмный слой того же цвета, что листы книги, — шва не видно)
+  panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, delay: 420, easing: 'ease-out', fill: 'forwards' });
+  title.animate([{ opacity: 0, transform: 'translate(-50%, -50%) scale(.96)' }, { opacity: 1, transform: 'translate(-50%, -50%) scale(1)' }], { duration: 420, delay: 460, easing: 'ease-out', fill: 'forwards' });
+  // разворот растягивается на весь экран, книга под ним тает; название растёт вместе с ним
+  const grow = 'cubic-bezier(.55,0,.2,1)';
+  panel.animate([{ transform: P0 }, { transform: 'translate(0px, 0px) scale(1, 1)' }], { duration: 640, delay: 880, easing: grow, fill: 'forwards' });
+  title.animate([{ transform: 'translate(-50%, -50%) scale(1)' }, { transform: 'translate(-50%, -50%) scale(1.22)' }], { duration: 640, delay: 880, easing: grow, fill: 'forwards', composite: 'replace' });
+  body.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, delay: 1000, easing: 'ease-in', fill: 'forwards' });
   });
+  // экран занят разворотом — название плавно тает
+  at(1700, () => fly?.querySelector('.fly-title').animate([{ opacity: 1 }, { opacity: 0 }], { duration: 420, easing: 'ease-in-out', fill: 'forwards', composite: 'replace' }));
 
-  // D. переход: страница из слоя становится настоящей
+  // переход: страница строится под непрозрачным слоем, потом слой мягко растворяется
   let gone = false;
   const go = () => {
     if (gone) return; gone = true;
     timers.forEach(clearTimeout);
     removeEventListener('keydown', onKey, true); removeEventListener('pointerdown', onSkip, true);
-    document.documentElement.dataset.arrive = a.dataset.book;
-    const pg = fly && pvR?.querySelector('.page');
-    const adopted = !!(pg && fly.contains(pg));
     let shown = false;
     const reveal = () => {
       if (shown) return; shown = true;
-      const f = fly || null; fly = null;
-      // страница уже перенесена — под слоем то же самое, убираем сразу; иначе (полёт пропущен) — мягко гасим
-      if (f && adopted) f.remove();
-      else if (f) { f.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: 'ease-out', fill: 'forwards' }); setTimeout(() => f.remove(), 280); }
-      setTimeout(() => { delete document.documentElement.dataset.arrive; }, 1200);
+      // два кадра — чтобы новая страница успела отрисоваться, прежде чем слой начнёт растворяться
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const f = fly;
+        if (f) { f.animate([{ opacity: getComputedStyle(f.querySelector('.fly-panel')).opacity }, { opacity: 0 }], { duration: 520, easing: 'ease-out', fill: 'forwards' }); setTimeout(() => f.remove(), 560); }
+        setTimeout(() => dispatchEvent(new CustomEvent('ege-bg', { detail: { pause: false } })), 560);
+      }));
     };
     addEventListener('ege-routed', reveal, { once: true });
     setTimeout(reveal, 1500); // страховка: страница не сообщила о себе
-    // готовую страницу отдаём маршрутизатору (только если полёт дошёл до конца — иначе он нарисует свою)
-    if (adopted) adopt?.(href, pg);
     location.hash = href;
   };
-  at(1640, go);
+  at(2130, go);
   // пропустить полёт: любой клик или Esc/Enter/пробел
   const onSkip = (e) => { e.preventDefault(); go(); };
   const onKey = (e) => { if (['Escape', 'Enter', ' '].includes(e.key)) { e.preventDefault(); go(); } };
